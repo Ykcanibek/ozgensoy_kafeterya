@@ -1,0 +1,876 @@
+/* ========================================================
+   ÖZGENSOY KAFETERYA - YETKİ & ROL YÖNETİMİ STİLLERİ
+   ======================================================== */
+
+.roles-container {
+  max-width: 1380px;
+  margin: 0 auto;
+  padding: 24px 20px 48px;
+  animation: rolesFadeIn 0.22s ease;
+}
+
+@keyframes rolesFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ÜST İSTATİSTİK KARTLARI */
+.roles-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.roles-stat-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1.5px solid #b6ced6;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 4px 14px -2px rgba(27, 65, 79, 0.05);
+  transition: all 0.2s ease;
+}
+
+.roles-stat-card:hover {
+  transform: translateY(-2px);
+  border-color: #346c80;
+  box-shadow: 0 8px 20px -4px rgba(27, 65, 79, 0.1);
+}
+
+.roles-stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.roles-stat-icon.primary {
+  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+  color: #0369a1;
+  border: 1px solid #7dd3fc;
+}
+
+.roles-stat-icon.gold {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #b45309;
+  border: 1px solid #fcd34d;
+}
+
+.roles-stat-icon.green {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  color: #047857;
+  border: 1px solid #86efac;
+}
+
+.roles-stat-icon.purple {
+  background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
+  color: #7e22ce;
+  border: 1px solid #d8b4fe;
+}
+
+.roles-stat-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.roles-stat-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+}
+
+.roles-stat-val {
+  margin: 2px 0 0;
+  font-size: 1.45rem;
+  font-weight: 900;
+  color: #173845;
+  font-family: 'Outfit', sans-serif;
+  line-height: 1.1;
+}
+
+/* ROL KARTLARI IZGARASI */
+.roles-grid-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.roles-grid-title-box h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #173845;
+}
+
+.roles-grid-title-box p {
+  margin: 2px 0 0;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.roles-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 18px;
+  margin-bottom: 32px;
+}
+
+.role-card {
+  background: #ffffff;
+  border-radius: 18px;
+  border: 1.5px solid #b6ced6;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 4px 16px -2px rgba(27, 65, 79, 0.06);
+  position: relative;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.role-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px -6px rgba(27, 65, 79, 0.12);
+  border-color: #346c80;
+}
+
+.role-card-top-accent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+}
+
+.role-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.role-card-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: 900;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
+.role-badge-tag {
+  font-size: 0.70rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.role-badge-tag.system {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.role-badge-tag.custom {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.role-card-body {
+  margin-bottom: 18px;
+}
+
+.role-card-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #173845;
+}
+
+.role-card-slug {
+  font-size: 0.76rem;
+  color: #64748b;
+  font-weight: 700;
+  font-family: monospace;
+  margin-top: 2px;
+  display: inline-block;
+  background: #f1f5f9;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.role-card-desc {
+  font-size: 0.82rem;
+  color: #475569;
+  line-height: 1.45;
+  margin-top: 8px;
+  min-height: 38px;
+}
+
+.role-card-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 14px;
+  font-size: 0.82rem;
+}
+
+.role-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #475569;
+  font-weight: 600;
+}
+
+.role-meta-item strong {
+  color: #173845;
+  font-weight: 800;
+}
+
+.role-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.role-btn-primary {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #346c80;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-size: 0.84rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.role-btn-primary:hover {
+  background: #173845;
+}
+
+.role-btn-icon-del {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1.5px solid #fee2e2;
+  background: #fef2f2;
+  color: #dc2626;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  flex-shrink: 0;
+}
+
+.role-btn-icon-del:hover {
+  background: #dc2626;
+  color: #ffffff;
+  border-color: #dc2626;
+}
+
+/* ========================================================
+   MODAL: DETAYLI YETKİ MATRİSİ DÜZENLEME FORMU
+   ======================================================== */
+.roles-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(5px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: rolesFadeIn 0.2s ease;
+}
+
+.roles-modal-box {
+  background: #ffffff;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 960px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.35);
+  border: 1.5px solid #b6ced6;
+  overflow: hidden;
+  animation: rolesScaleUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes rolesScaleUp {
+  from { opacity: 0; transform: scale(0.96) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.roles-modal-header {
+  padding: 16px 24px;
+  background: linear-gradient(135deg, #173845 0%, #265464 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.roles-modal-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.roles-modal-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.roles-modal-subtitle {
+  margin: 2px 0 0;
+  font-size: 0.76rem;
+  color: #9cbcc8;
+}
+
+.roles-modal-close-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  color: #ffffff;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.roles-modal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.roles-modal-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  flex: 1;
+  background: #f8fafc;
+}
+
+/* ROL TEMEL BİLGİ ALANLARI */
+.role-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  background: #ffffff;
+  padding: 16px 18px;
+  border-radius: 14px;
+  border: 1.5px solid #d8e8ee;
+  margin-bottom: 20px;
+}
+
+.role-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.role-form-label {
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #475569;
+  letter-spacing: 0.4px;
+}
+
+.role-form-input {
+  border: 1.5px solid #cbdde3;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.88rem;
+  color: #173845;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.15s ease;
+  background: #ffffff;
+}
+
+.role-form-input:focus {
+  border-color: #346c80;
+  box-shadow: 0 0 0 3px rgba(52, 108, 128, 0.12);
+}
+
+.role-form-input:disabled {
+  background: #f1f5f9;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+/* Renk Seçici */
+.role-color-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.role-color-dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform 0.15s ease;
+}
+
+.role-color-dot:hover {
+  transform: scale(1.15);
+}
+
+.role-color-dot.active {
+  border-color: #173845;
+  box-shadow: 0 0 0 2px #ffffff;
+  transform: scale(1.18);
+}
+
+/* İZİN MATRİSİ ÇUBUĞU (Hızlı Seçim) */
+.roles-matrix-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.roles-matrix-counter {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #173845;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.roles-matrix-quick-btns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.roles-quick-btn {
+  font-size: 0.76rem;
+  font-weight: 800;
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1.5px solid #d3e3e8;
+  background: #ffffff;
+  color: #346c80;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.roles-quick-btn:hover {
+  background: #173845;
+  border-color: #173845;
+  color: #ffffff;
+}
+
+/* MODÜL BAZLI İZİN KARTLARI */
+.roles-modules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.role-module-card {
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1.5px solid #d8e8ee;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+}
+
+.role-module-header {
+  padding: 12px 18px;
+  background: #f1f6f8;
+  border-bottom: 1.5px solid #e2edf1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.role-module-title-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.role-module-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #346c80;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.role-module-name {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #173845;
+}
+
+.role-module-desc {
+  font-size: 0.74rem;
+  color: #64748b;
+  margin-top: 1px;
+}
+
+.role-module-toggle-all {
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: #0369a1;
+  background: #e0f2fe;
+  border: 1px solid #bae6fd;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.role-module-toggle-all:hover {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+/* İZİN IZGARASI (GÖRME, EKLEME, DÜZENLEME, SİLME, ÖZEL) */
+.role-permissions-grid {
+  padding: 14px 18px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.role-perm-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1.5px solid #edf2f7;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.role-perm-item:hover {
+  background: #f1f8fa;
+  border-color: #cbdde3;
+}
+
+.role-perm-item.checked {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+
+/* Özel Switch / Checkbox Butonu */
+.role-perm-checkbox {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+  flex-shrink: 0;
+  transition: all 0.14s ease;
+}
+
+.role-perm-item.checked .role-perm-checkbox {
+  background: #10b981;
+  border-color: #10b981;
+  color: #ffffff;
+}
+
+.role-perm-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.role-perm-label {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #1e292d;
+  line-height: 1.3;
+}
+
+.role-perm-action-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 4px;
+  width: fit-content;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.role-perm-action-badge.view {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.role-perm-action-badge.create {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.role-perm-action-badge.edit {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.role-perm-action-badge.delete {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.role-perm-action-badge.special {
+  background: #f3e8ff;
+  color: #7e22ce;
+}
+
+/* MODAL ALTI BUTONLAR */
+.roles-modal-footer {
+  padding: 14px 24px;
+  background: #ffffff;
+  border-top: 1.5px solid #e2edf1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.roles-btn-cancel {
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.roles-btn-cancel:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #1e292d;
+}
+
+.roles-btn-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #173845 0%, #265464 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 24px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(23, 56, 69, 0.25);
+  transition: all 0.16s ease;
+}
+
+.roles-btn-save:hover {
+  background: #173845;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(23, 56, 69, 0.35);
+}
+
+.roles-btn-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* SİLME ONAY MODALI */
+.roles-delete-modal-box {
+  background: #ffffff;
+  border-radius: 18px;
+  width: 100%;
+  max-width: 440px;
+  padding: 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+  border: 1.5px solid #b6ced6;
+  text-align: center;
+}
+
+.roles-delete-icon-box {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: #fee2e2;
+  color: #dc2626;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.roles-delete-title {
+  margin: 0 0 8px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #173845;
+}
+
+.roles-delete-desc {
+  font-size: 0.86rem;
+  color: #64748b;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.roles-delete-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+}
+
+.roles-btn-delete-confirm {
+  background: #dc2626;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.roles-btn-delete-confirm:hover {
+  background: #b91c1c;
+}
+
+/* ========================================================
+   MOBİL VE TABLET UYUMLULUK
+   ======================================================== */
+@media (max-width: 768px) {
+  .roles-container {
+    padding: 14px 12px 36px;
+  }
+
+  .roles-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .roles-stat-card {
+    padding: 12px 14px;
+    gap: 12px;
+  }
+
+  .roles-stat-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .roles-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .roles-modal-backdrop {
+    padding: 8px;
+  }
+
+  .roles-modal-box {
+    max-height: 94vh;
+    border-radius: 14px;
+  }
+
+  .roles-modal-header {
+    padding: 12px 16px;
+  }
+
+  .roles-modal-body {
+    padding: 14px 16px;
+  }
+
+  .role-form-grid {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+
+  .role-permissions-grid {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+
+  .roles-modal-footer {
+    flex-direction: column-reverse;
+    gap: 8px;
+    padding: 12px 16px;
+  }
+
+  .roles-btn-cancel,
+  .roles-btn-save {
+    width: 100%;
+    justify-content: center;
+    padding: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .roles-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}

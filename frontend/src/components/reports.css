@@ -1,0 +1,2279 @@
+/* ==========================================================================
+   ÖZGENSOY KAFETERYA - SADE, NET & PROFESYONEL GÜN SONU / RAPORLAR
+   GÖZÜ YORMAYAN, FERAH VE ANLAŞILIR KASA DÜZENİ
+   ========================================================================== */
+
+/* Üst Tarih Çubuğu */
+.rep-header-bar {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 12px 18px;
+  margin-bottom: 16px;
+  border: 1.5px solid #b6ced6;
+  box-shadow: 0 4px 16px -2px rgba(27, 65, 79, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.rep-date-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.rep-date-pill {
+  padding: 8px 15px;
+  border-radius: 10px;
+  border: 1.5px solid #d3e3e8;
+  background: #f4f8fa;
+  color: #2b5563;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+  box-shadow: 0 1px 2px rgba(27, 65, 79, 0.04);
+}
+
+.rep-date-pill:hover {
+  background: #e2eef2;
+  border-color: #8bb1bf;
+  color: #173845;
+  transform: translateY(-1px);
+}
+
+.rep-date-pill.active {
+  background: linear-gradient(135deg, #173845 0%, #265464 100%);
+  border-color: #173845;
+  color: #ffffff;
+  box-shadow: 0 3px 10px rgba(23, 56, 69, 0.24);
+}
+
+.rep-date-pill.active svg {
+  color: #38bdf8;
+}
+
+/* Seçili Rapor Dönemi Rozeti (Sağ Kısım - Şık & Vurgulu) */
+.rep-selected-date-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #f4f8fa 0%, #ebf4f7 100%);
+  border: 1.5px solid #b8d4de;
+  border-radius: 12px;
+  padding: 6px 14px;
+  box-shadow: 0 2px 8px -1px rgba(27, 65, 79, 0.05);
+  margin-left: auto;
+}
+
+.rep-date-badge-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #173845 0%, #265464 100%);
+  color: #38bdf8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(23, 56, 69, 0.22);
+  flex-shrink: 0;
+}
+
+.rep-date-badge-content {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.rep-date-badge-label {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #558090;
+}
+
+.rep-date-badge-val {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #173845;
+  white-space: nowrap;
+}
+
+.rep-custom-date-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f0f7f9;
+  border: 1.5px solid #b6ced6;
+  border-radius: 10px;
+  padding: 3px 8px;
+}
+
+.rep-date-input {
+  border: 1px solid #b6ced6;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  font-family: inherit;
+  color: #1e292d;
+  background: #ffffff;
+}
+
+/* ==========================================================================
+   ANA GÜN SONU KASA PANOSU (BÜTÜNCÜL, FERAH & NET)
+   ========================================================================== */
+/* ==========================================================================
+   ÖZGENSOY KAFETERYA - PREMİUM GÜN SONU KASA KONSOLU
+   ========================================================================== */
+.rep-pos-summary-wrapper {
+  background: #ffffff;
+  border: 1.5px solid #b6ced6;
+  border-radius: 20px;
+  padding: 16px 20px;
+  box-shadow: 0 6px 24px -4px rgba(27, 65, 79, 0.08);
+  margin-bottom: 22px;
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  overflow-x: auto;
+}
+
+/* Sol Vurgulu Kasa Ciro Kartı (Özgensoy Slate-Teal & Emerald Glow) */
+.rep-pos-total-badge {
+  background: linear-gradient(135deg, #173845 0%, #204b5a 50%, #2b6174 100%);
+  border: 1.5px solid rgba(16, 185, 129, 0.45);
+  border-radius: 18px;
+  padding: 18px 24px;
+  min-width: 260px;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 10px 24px -2px rgba(23, 56, 69, 0.35);
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.rep-pos-total-badge::after {
+  content: '';
+  position: absolute;
+  top: -30px;
+  right: -30px;
+  width: 90px;
+  height: 90px;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.rep-pos-total-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: #a7f3d0;
+  text-transform: uppercase;
+}
+
+.rep-pos-total-pill-tag {
+  background: rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #6ee7b7;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.rep-pos-total-dot {
+  width: 8px;
+  height: 8px;
+  background: #10b981;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #10b981;
+  display: inline-block;
+  animation: pulse-dot 2s infinite ease-in-out;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.2); }
+}
+
+.rep-pos-total-val {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 2.25rem;
+  font-weight: 800;
+  line-height: 1.1;
+  margin: 6px 0 4px 0;
+  white-space: nowrap;
+  letter-spacing: -0.5px;
+  color: #ffffff;
+}
+
+.rep-pos-total-currency {
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin-left: 4px;
+  color: #34d399;
+}
+
+.rep-pos-total-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.74rem;
+  color: #cbd5e1;
+  font-weight: 600;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+/* Dikey İnce Ayırıcı */
+.rep-pos-v-divider {
+  width: 1.5px;
+  background: #e2e8f0;
+  flex-shrink: 0;
+  margin: 4px 0;
+}
+
+/* Sağ 4 Beyaz Kart */
+.rep-pos-subcards-row {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+  flex: 1;
+}
+
+.rep-pos-subcard {
+  flex: 1;
+  background: #ffffff;
+  border: 1.5px solid #edf2f7;
+  border-radius: 18px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 145px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.rep-pos-subcard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(27, 65, 79, 0.07);
+  border-color: #b6ced6;
+}
+
+.rep-pos-subitem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rep-pos-subitem.bottom {
+  border-top: 1px solid #f1f5f9;
+  padding-top: 8px;
+}
+
+.rep-pos-sublabel-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.rep-pos-sublabel-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rep-pos-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.rep-pos-subamount {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-top: 2px;
+}
+
+.rep-pos-subamount .cur {
+  font-size: 0.92rem;
+  font-weight: 600;
+  margin-left: 3px;
+}
+
+.rep-pos-subcaption {
+  font-size: 0.68rem;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+@media (max-width: 1024px) {
+  .rep-pos-summary-wrapper {
+    flex-direction: column;
+  }
+  .rep-pos-v-divider {
+    display: none;
+  }
+  .rep-pos-subcards-row {
+    flex-wrap: wrap;
+  }
+}
+
+/* ========================================================
+   SEKMELER & İÇERİK - PREMİUM SEGMENTED KART KONTROLÜ
+   ======================================================== */
+.rep-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff;
+  border: 1.5px solid #b6ced6;
+  border-radius: 14px;
+  padding: 8px 10px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 14px -2px rgba(27, 65, 79, 0.06);
+  overflow-x: auto;
+}
+
+.rep-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 1.5px solid #d3e3e8;
+  background: #f4f8fa;
+  color: #2b5563;
+  font-size: 0.90rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  user-select: none;
+  box-shadow: 0 1px 3px rgba(27, 65, 79, 0.04);
+}
+
+.rep-tab-btn:hover {
+  background: #e2eef2;
+  color: #173845;
+  border-color: #8bb1bf;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(27, 65, 79, 0.08);
+}
+
+.rep-tab-btn.active {
+  background: linear-gradient(135deg, #173845 0%, #265464 100%);
+  border-color: #173845;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(23, 56, 69, 0.28);
+}
+
+.rep-tab-btn svg {
+  color: #558090;
+  transition: color 0.18s ease;
+}
+
+.rep-tab-btn:hover svg {
+  color: #173845;
+}
+
+.rep-tab-btn.active svg {
+  color: #38bdf8;
+}
+
+.rep-tab-badge {
+  font-size: 0.74rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: #d4e5eb;
+  color: #173845;
+  transition: all 0.18s ease;
+}
+
+.rep-tab-btn:hover .rep-tab-badge {
+  background: #c3d9e1;
+}
+
+.rep-tab-btn.active .rep-tab-badge {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+/* 2 Sütunlu Kompakt Görünüm (Kategoriler & En Çok Satanlar) */
+.rep-analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.rep-card-box {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1.5px solid #b6ced6;
+  box-shadow: 0 4px 14px -2px rgba(27, 65, 79, 0.05);
+  overflow: hidden;
+}
+
+.rep-card-header {
+  padding: 12px 18px;
+  background: #f8fbfc;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rep-card-title {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #1e292d;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rep-card-body {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 380px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #b6ced6 #f1f6f8;
+}
+
+.rep-card-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.rep-card-body::-webkit-scrollbar-track {
+  background: #f1f6f8;
+  border-radius: 4px;
+}
+
+.rep-card-body::-webkit-scrollbar-thumb {
+  background: #b6ced6;
+  border-radius: 4px;
+}
+
+.rep-card-body::-webkit-scrollbar-thumb:hover {
+  background: #84a8b5;
+}
+
+/* Kategori Satırı */
+.rep-cat-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.rep-cat-row:last-child {
+  border-bottom: none;
+}
+
+.rep-cat-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.86rem;
+}
+
+.rep-cat-progress-bg {
+  width: 100%;
+  height: 6px;
+  background: #eef3f5;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.rep-cat-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #346c80, #5da3b8);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+/* Ürün Satırı */
+.rep-product-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 10px;
+  transition: background 0.15s ease;
+}
+
+.rep-product-row:hover {
+  background: #f8fafc;
+}
+
+.rep-rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.rep-rank-badge.top1 {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.rep-rank-badge.top2 {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.rep-rank-badge.top3 {
+  background: #f3e8ff;
+  color: #7e22ce;
+  border: 1px solid #e9d5ff;
+}
+
+/* ========================================================
+   MODERN TABLOLAR & ADİSYON / FİŞ LİSTESİ
+   ======================================================== */
+.rep-table-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1.5px solid #b6ced6;
+  box-shadow: 0 4px 16px -2px rgba(27, 65, 79, 0.06);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+/* Toolbar */
+.rep-table-toolbar {
+  padding: 14px 18px;
+  background: #ffffff;
+  border-bottom: 1.5px solid #e2edf1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* Arama Kutusu */
+.rep-table-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f4f8fa;
+  border: 1.5px solid #cbdde3;
+  border-radius: 10px;
+  padding: 7px 12px;
+  width: 290px;
+  max-width: 100%;
+  transition: all 0.16s ease;
+}
+
+.rep-table-search-box:focus-within {
+  background: #ffffff;
+  border-color: #346c80;
+  box-shadow: 0 0 0 3px rgba(52, 108, 128, 0.12);
+}
+
+.rep-table-search-box input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.84rem;
+  color: #173845;
+  width: 100%;
+  font-family: inherit;
+}
+
+.rep-table-search-box input::placeholder {
+  color: #7997a3;
+}
+
+/* Filtre Kapsülleri (Nakit, Kart vb.) */
+.rep-filter-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.rep-filter-pill {
+  padding: 7px 13px;
+  border-radius: 9px;
+  border: 1.5px solid #d3e3e8;
+  background: #f8fafb;
+  color: #3b6170;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+
+.rep-filter-pill:hover {
+  background: #e2eef2;
+  border-color: #8bb1bf;
+  color: #173845;
+}
+
+.rep-filter-pill.active {
+  background: linear-gradient(135deg, #173845 0%, #265464 100%);
+  border-color: #173845;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(23, 56, 69, 0.22);
+}
+
+.rep-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* Toolbar Sağ Özet Rozeti */
+.rep-table-info-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #f1f7f9;
+  border: 1.5px solid #cce1e8;
+  padding: 6px 14px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  color: #3b6170;
+  font-weight: 700;
+  margin-left: auto;
+}
+
+.rep-pill-sep {
+  color: #9cbcc8;
+}
+
+/* Modern Tablo Kuralları */
+.rep-modern-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  background: #ffffff;
+}
+
+.rep-modern-table th {
+  background: #f0f6f8;
+  color: #346c80;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 12px 16px;
+  border-bottom: 1.5px solid #d8e8ee;
+  white-space: nowrap;
+}
+
+.rep-modern-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #edf4f6;
+  font-size: 0.86rem;
+  color: #1e292d;
+  background: #ffffff;
+  vertical-align: middle;
+}
+
+.rep-table-row {
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.rep-table-row:hover td {
+  background: #f5fafc;
+}
+
+.rep-table-row.expanded td {
+  background: #edf5f8;
+  border-bottom-color: #c9dfe6;
+}
+
+/* Satır İçi Hücre Elemanları */
+.rep-receipt-code {
+  font-size: 0.90rem;
+  font-weight: 800;
+  color: #173845;
+  font-family: 'Outfit', sans-serif;
+}
+
+.rep-order-ref-pill {
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-family: monospace;
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+}
+
+.rep-receipt-time {
+  font-size: 0.74rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.rep-table-num-pill {
+  font-size: 0.70rem;
+  font-weight: 800;
+  color: #173845;
+  background: #dbe9ee;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.rep-method-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 7px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  width: fit-content;
+}
+
+.rep-customer-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #b45309;
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.rep-user-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #346c80;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.rep-discount-pill {
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: #dc2626;
+  background: #fee2e2;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.rep-tip-pill {
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: #059669;
+  background: #d1fae5;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.rep-amount-highlight {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: #047857;
+}
+
+.rep-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1.5px solid #d3e3e8;
+  background: #ffffff;
+  color: #346c80;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.rep-action-btn:hover,
+.rep-action-btn.active {
+  background: #173845;
+  border-color: #173845;
+  color: #ffffff;
+}
+
+.rep-action-btn.print {
+  color: #0284c7;
+  border-color: #bae6fd;
+  background: #f0f9ff;
+}
+
+.rep-action-btn.print:hover {
+  background: #0284c7;
+  border-color: #0284c7;
+  color: #ffffff;
+}
+
+/* Çekmece (Accordion Drawer) */
+.rep-drawer-tr td {
+  background: #f8fafc !important;
+  border-bottom: 2px solid #b6ced6 !important;
+}
+
+.rep-receipt-items-drawer {
+  background: #ffffff;
+  border: 1.5px solid #cfe0e6;
+  border-radius: 12px;
+  margin: 10px 16px 16px 16px;
+  padding: 16px 20px;
+  box-shadow: 0 4px 12px rgba(27, 65, 79, 0.05);
+}
+
+.rep-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1.5px solid #edf3f5;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rep-drawer-items-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.rep-drawer-item-header {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  padding: 6px 10px;
+  background: #f1f6f8;
+  border-radius: 6px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: #486b78;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 6px;
+}
+
+.rep-drawer-item-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  align-items: center;
+  padding: 8px 10px;
+  border-bottom: 1px dashed #e2edf0;
+  font-size: 0.84rem;
+}
+
+.rep-drawer-item-row:last-of-type {
+  border-bottom: none;
+}
+
+.rep-drawer-cat-badge {
+  font-size: 0.72rem;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.rep-drawer-note-badge {
+  font-size: 0.72rem;
+  color: #b45309;
+  background: #fef3c7;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.rep-drawer-summary-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 14px;
+  margin-top: 10px;
+  border-top: 1.5px solid #e2edf1;
+}
+
+/* Saatlik Grafik Kartı (İsteğe Bağlı) */
+.rep-hourly-chart-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1.5px solid #b6ced6;
+  box-shadow: 0 4px 14px -2px rgba(27, 65, 79, 0.05);
+  padding: 18px 22px;
+  margin-top: 0;
+  margin-bottom: 20px;
+}
+
+.rep-hourly-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 120px;
+  padding-top: 16px;
+  border-bottom: 1px solid #cbd5e1;
+  overflow-x: auto;
+}
+
+.rep-hourly-col {
+  flex: 1;
+  min-width: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+  position: relative;
+}
+
+.rep-hourly-bar {
+  width: 100%;
+  max-width: 18px;
+  background: linear-gradient(180deg, #346c80 0%, #5da3b8 100%);
+  border-radius: 4px 4px 0 0;
+  transition: height 0.3s ease;
+  cursor: pointer;
+}
+
+.rep-hourly-bar:hover {
+  background: #1b414f;
+}
+
+.rep-hourly-label {
+  font-size: 0.68rem;
+  color: #64748b;
+  margin-top: 4px;
+  white-space: nowrap;
+}
+
+/* ========================================================
+   FİŞ / ADİSYON DETAYI POP-UP MODAL STİLLERİ
+   ======================================================== */
+.rep-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: repFadeIn 0.18s ease;
+  overscroll-behavior: contain;
+}
+
+@keyframes repFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.rep-receipt-modal-box {
+  background: #ffffff;
+  border-radius: 18px;
+  width: 100%;
+  max-width: 580px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 48px -12px rgba(15, 23, 42, 0.35);
+  border: 1.5px solid #b6ced6;
+  overflow: hidden;
+  animation: repScaleUp 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes repScaleUp {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.rep-receipt-modal-header {
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #173845 0%, #265464 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rep-receipt-modal-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #38bdf8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.rep-receipt-modal-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rep-receipt-modal-id {
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  background: rgba(56, 189, 248, 0.22);
+  color: #7dd3fc;
+  border-radius: 6px;
+}
+
+.rep-receipt-modal-order-id {
+  font-size: 0.74rem;
+  font-weight: 700;
+  font-family: monospace;
+  padding: 2px 7px;
+  background: rgba(14, 165, 233, 0.22);
+  color: #bae6fd;
+  border: 1px solid rgba(186, 230, 253, 0.35);
+  border-radius: 6px;
+  letter-spacing: 0.3px;
+}
+
+.rep-copyable-code {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px dashed #93c5fd;
+  color: #0369a1 !important;
+  font-family: monospace;
+  font-size: 0.82rem !important;
+  width: fit-content;
+  transition: all 0.15s ease;
+}
+
+.rep-copyable-code:hover {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  color: #1d4ed8 !important;
+}
+
+.rep-receipt-modal-subtitle {
+  font-size: 0.74rem;
+  color: #cbd5e1;
+  margin-top: 2px;
+}
+
+.rep-modal-close-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.rep-modal-close-btn:hover {
+  background: rgba(239, 68, 68, 0.85);
+  color: #ffffff;
+}
+
+.rep-modal-close-btn.print {
+  background: rgba(14, 165, 233, 0.25);
+  color: #bae6fd;
+}
+
+.rep-modal-close-btn.print:hover {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.rep-receipt-modal-body {
+  padding: 18px 22px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: #fcfdfe;
+  overscroll-behavior: contain;
+}
+
+/* Üst 4'lü Bilgi Izgarası */
+.rep-receipt-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  background: #f1f7f9;
+  border: 1.5px solid #d0e3eb;
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.rep-receipt-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rep-receipt-info-item .info-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #5d8290;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.rep-receipt-info-item .info-val {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #173845;
+}
+
+/* Kalemler Bölümü */
+.rep-modal-items-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rep-modal-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: #1e292d;
+}
+
+.rep-items-count {
+  font-size: 0.72rem;
+  color: #64748b;
+  font-weight: 700;
+  background: #e2edf1;
+  padding: 2px 7px;
+  border-radius: 6px;
+  margin-left: auto;
+}
+
+.rep-modal-table-wrap {
+  border: 1.5px solid #e2edf1;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.rep-modal-items-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.rep-modal-items-table th {
+  background: #f8fafc;
+  padding: 10px 14px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border-bottom: 1.5px solid #e2edf1;
+}
+
+.rep-modal-items-table td {
+  padding: 10px 14px;
+  border-bottom: 1px dashed #edf2f5;
+  font-size: 0.85rem;
+}
+
+.rep-modal-items-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Finansal Özet Kartı */
+.rep-modal-finance-card {
+  background: #ffffff;
+  border: 1.5px solid #d3e5ec;
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.finance-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.84rem;
+  color: #475569;
+}
+
+.finance-row.discount {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.finance-row.tip {
+  color: #059669;
+  font-weight: 700;
+}
+
+.finance-row.mixed-split {
+  font-size: 0.78rem;
+  color: #64748b;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed #e2e8f0;
+}
+
+.finance-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+  margin-top: 4px;
+  border-top: 1.5px solid #b6ced6;
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #173845;
+}
+
+.finance-total-row .total-val {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #047857;
+}
+
+/* Modal Footer */
+.rep-receipt-modal-footer {
+  padding: 12px 20px;
+  background: #f1f5f9;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.rep-modal-btn {
+  padding: 8px 18px;
+  border-radius: 10px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  border: none;
+}
+
+.rep-modal-btn.close {
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  color: #334155;
+}
+
+.rep-modal-btn.close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+/* Z-RAPORU MODAL STİLLERİ */
+.zreport-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overscroll-behavior: contain;
+}
+
+.zreport-modal-content {
+  background: #ffffff;
+  border-radius: 18px;
+  width: 100%;
+  max-width: 420px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+.zreport-modal-header {
+  padding: 12px 18px;
+  background: #346c80;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.zreport-modal-body {
+  padding: 18px;
+  overflow-y: auto;
+  font-family: 'Courier New', Courier, monospace;
+  background: #fffdf9;
+  color: #1e292d;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  overscroll-behavior: contain;
+}
+
+.zreport-ticket {
+  border: 1px dashed #cbd5e1;
+  padding: 14px;
+  background: #ffffff;
+  border-radius: 6px;
+}
+
+.zreport-modal-footer {
+  padding: 12px 18px;
+  background: #f1f5f9;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.rep-receipt-print-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff !important;
+  border: none;
+  padding: 9px 20px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+  transition: all 0.18s ease;
+}
+
+.rep-receipt-print-btn:hover {
+  background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(2, 132, 199, 0.4);
+}
+
+.rep-receipt-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  color: #334155 !important;
+  border: 1.5px solid #cbd5e1;
+  padding: 9px 18px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.rep-receipt-close-btn:hover {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  color: #0f172a !important;
+}
+
+/* ========================================================
+   PERSONEL BAZLI SATIŞ & CİRO KARNESİ STİLLERİ
+   ======================================================== */
+.rep-staff-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: repFadeIn 0.2s ease;
+}
+
+.rep-staff-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.rep-staff-kpi-card {
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1.5px solid #cfe0e6;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: 0 4px 14px -3px rgba(23, 56, 69, 0.05);
+  transition: all 0.2s ease;
+}
+
+.rep-staff-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px -4px rgba(23, 56, 69, 0.1);
+  border-color: #9cbcc8;
+}
+
+.rep-staff-kpi-card.leader {
+  background: linear-gradient(135deg, #ffffff 0%, #fffdf5 100%);
+  border: 1.5px solid #fde68a;
+}
+
+.rep-staff-kpi-card.leader:hover {
+  border-color: #f59e0b;
+}
+
+.rep-kpi-icon-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.rep-kpi-icon-wrap.gold {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #b45309;
+  border: 1px solid #fcd34d;
+}
+
+.rep-kpi-icon-wrap.green {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  color: #047857;
+  border: 1px solid #86efac;
+}
+
+.rep-kpi-icon-wrap.blue {
+  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+  color: #0369a1;
+  border: 1px solid #7dd3fc;
+}
+
+.rep-kpi-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.rep-kpi-sub-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+}
+
+.rep-kpi-main-val {
+  margin: 0;
+  font-size: 1.28rem;
+  font-weight: 900;
+  color: #173845;
+  font-family: 'Outfit', sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rep-kpi-meta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  margin-top: 3px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  width: fit-content;
+}
+
+.rep-kpi-meta-badge.gold {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.rep-kpi-meta-text {
+  font-size: 0.76rem;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.rep-kpi-meta-text strong {
+  color: #173845;
+}
+
+/* Sıralama Rozetleri (Podium) */
+.rep-rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  font-weight: 800;
+  color: #64748b;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+}
+
+.rep-rank-badge.rank-1 {
+  font-size: 1.15rem;
+  background: #fef3c7;
+  border: 1.5px solid #fde68a;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);
+}
+
+.rep-rank-badge.rank-2 {
+  font-size: 1.15rem;
+  background: #f1f5f9;
+  border: 1.5px solid #cbd5e1;
+}
+
+.rep-rank-badge.rank-3 {
+  font-size: 1.15rem;
+  background: #ffedd5;
+  border: 1.5px solid #fed7aa;
+}
+
+/* Personel Avatarı */
+.rep-staff-avatar-circle {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.86rem;
+  font-weight: 900;
+  background: linear-gradient(135deg, #173845 0%, #346c80 100%);
+  color: #ffffff;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(23, 56, 69, 0.15);
+}
+
+.rep-staff-avatar-circle.rank-1 {
+  background: linear-gradient(135deg, #b45309 0%, #f59e0b 100%);
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.35);
+}
+
+.rep-staff-avatar-circle.rank-2 {
+  background: linear-gradient(135deg, #475569 0%, #94a3b8 100%);
+}
+
+.rep-staff-avatar-circle.rank-3 {
+  background: linear-gradient(135deg, #9a3412 0%, #ea580c 100%);
+}
+
+/* Rol Hapları */
+.rep-role-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+.rep-role-pill.admin {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+.rep-role-pill.kitchen {
+  background: #fff7ed;
+  color: #c2410c;
+  border-color: #fed7aa;
+}
+
+.rep-role-pill.cashier {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+/* İşlem Adedi Hapı */
+.rep-staff-count-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.82rem;
+  color: #334155;
+  font-weight: 600;
+}
+
+.rep-staff-count-pill strong {
+  font-size: 0.94rem;
+  font-weight: 900;
+  color: #173845;
+}
+
+/* Ciro Payı & Mini Progress Bar */
+.rep-share-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  max-width: 110px;
+}
+
+.rep-share-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rep-share-percent {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #173845;
+  font-family: 'Outfit', sans-serif;
+}
+
+.rep-share-bar-bg {
+  width: 100%;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.rep-share-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981 0%, #047857 100%);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.rep-share-bar-fill.gold {
+  background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%);
+}
+
+.rep-staff-tr:hover td {
+  background: #f8fafc;
+}
+
+/* Navbar Rapor Aksiyon Butonları */
+.rep-nav-actions-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rep-nav-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  white-space: nowrap;
+}
+
+.rep-nav-action-btn.print {
+  background: #ffffff;
+  border: 1.5px solid #346c80;
+  color: #346c80;
+}
+
+.rep-nav-action-btn.print:hover {
+  background: #f0f7f9;
+  border-color: #265464;
+}
+
+.rep-nav-action-btn.refresh {
+  background: #dbe9ee;
+  border: 1px solid #b6ced6;
+  color: #1b414f;
+}
+
+.rep-nav-action-btn.refresh:hover {
+  background: #c9dfe6;
+}
+
+/* ========================================================
+   GELİŞMİŞ MOBİL & TABLET UYUMLULUK (RESPONSIVE SYSTEM)
+   ======================================================== */
+
+/* 1. TABLET VE KÜÇÜK DİZÜSTÜ EKRANLAR (<= 1024px) */
+@media (max-width: 1024px) {
+  .rep-pos-summary-wrapper {
+    flex-direction: column;
+    padding: 14px;
+    gap: 14px;
+  }
+  .rep-pos-total-badge {
+    min-width: 100%;
+    width: 100%;
+  }
+  .rep-pos-v-divider {
+    display: none;
+  }
+  .rep-pos-subcards-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    width: 100%;
+  }
+  .rep-analytics-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 2. STANDART MOBİL VE KÜÇÜK TABLET EKRANLARI (<= 768px) */
+@media (max-width: 768px) {
+  /* Üst Tarih Kontrol Çubuğu */
+  .rep-header-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    margin-bottom: 12px;
+  }
+
+  .rep-date-pills {
+    display: flex;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+    gap: 6px;
+    scrollbar-width: none;
+    width: 100%;
+  }
+
+  .rep-date-pills::-webkit-scrollbar {
+    display: none;
+  }
+
+  .rep-date-pill {
+    flex-shrink: 0;
+    padding: 7px 12px;
+    font-size: 0.80rem;
+    white-space: nowrap;
+  }
+
+  .rep-custom-date-box {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    box-sizing: border-box;
+  }
+
+  .rep-date-input {
+    flex: 1;
+    min-width: 120px;
+    font-size: 0.78rem;
+    padding: 6px 8px;
+  }
+
+  .rep-selected-date-badge {
+    width: 100%;
+    margin-left: 0;
+    box-sizing: border-box;
+    justify-content: flex-start;
+    padding: 8px 12px;
+    border-radius: 10px;
+  }
+
+  .rep-date-badge-val {
+    font-size: 0.82rem;
+  }
+
+  /* Ana Navigasyon Sekmeleri */
+  .rep-tabs-bar {
+    padding: 6px 8px;
+    gap: 6px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    border-radius: 12px;
+    margin-bottom: 14px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .rep-tabs-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .rep-tab-btn {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    font-size: 0.82rem;
+    gap: 6px;
+    border-radius: 8px;
+    white-space: nowrap;
+  }
+
+  .rep-tab-badge {
+    font-size: 0.68rem;
+    padding: 1px 5px;
+  }
+
+  /* Sekme 1: Finansal Özet */
+  .rep-pos-summary-wrapper {
+    padding: 12px;
+    border-radius: 14px;
+    margin-bottom: 14px;
+  }
+
+  .rep-pos-total-badge {
+    padding: 14px 16px;
+    border-radius: 14px;
+  }
+
+  .rep-pos-total-val {
+    font-size: 1.85rem;
+  }
+
+  .rep-pos-total-currency {
+    font-size: 1.35rem;
+  }
+
+  .rep-pos-subcards-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .rep-pos-subcard {
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 12px;
+  }
+
+  .rep-pos-subamount {
+    font-size: 1.12rem;
+  }
+
+  .rep-analytics-grid {
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .rep-card-box {
+    border-radius: 12px;
+  }
+
+  .rep-card-header {
+    padding: 10px 14px;
+  }
+
+  .rep-hourly-chart-card {
+    padding: 12px 14px;
+    border-radius: 14px;
+    margin-bottom: 14px;
+  }
+
+  .rep-hourly-bars {
+    height: 100px;
+    gap: 2px;
+    padding-top: 10px;
+  }
+
+  .rep-hourly-col {
+    min-width: 18px;
+  }
+
+  .rep-hourly-bar {
+    max-width: 12px;
+  }
+
+  .rep-hourly-label {
+    font-size: 0.60rem;
+  }
+
+  /* Sekme 2 & 3: Tablolar ve Toolbar */
+  .rep-table-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .rep-table-toolbar > div:first-child {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: 10px;
+  }
+
+  .rep-table-search-box {
+    width: 100% !important;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .rep-filter-pills {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+    gap: 6px;
+    width: 100%;
+    scrollbar-width: none;
+  }
+
+  .rep-filter-pills::-webkit-scrollbar {
+    display: none;
+  }
+
+  .rep-filter-pill {
+    flex-shrink: 0;
+    padding: 6px 10px;
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
+
+  .rep-table-info-pill {
+    width: 100%;
+    box-sizing: border-box;
+    justify-content: space-between;
+    padding: 8px 12px;
+    font-size: 0.78rem;
+  }
+
+  .rep-table-card {
+    border-radius: 12px;
+    margin-bottom: 16px;
+  }
+
+  /* Tablo Hücreleri Kompakt */
+  .rep-modern-table th,
+  .rep-modern-table td,
+  .report-data-table th,
+  .report-data-table td {
+    padding: 8px 10px;
+    font-size: 0.80rem;
+    white-space: nowrap;
+  }
+
+  .rep-receipt-code {
+    font-size: 0.82rem;
+  }
+
+  .rep-amount-highlight {
+    font-size: 0.94rem;
+  }
+
+  .rep-action-btn {
+    padding: 4px 8px;
+    font-size: 0.72rem;
+  }
+
+  /* Çekmece (Drawer) */
+  .rep-receipt-items-drawer {
+    margin: 6px 6px 12px 6px;
+    padding: 10px 12px;
+    border-radius: 10px;
+  }
+
+  .rep-drawer-item-header {
+    grid-template-columns: 2fr 0.8fr 1fr 1fr;
+    font-size: 0.68rem;
+    padding: 4px 6px;
+  }
+
+  .rep-drawer-item-row {
+    grid-template-columns: 2fr 0.8fr 1fr 1fr;
+    font-size: 0.76rem;
+    padding: 6px 6px;
+  }
+
+  /* Sekme 3: Personel Karnesi Özel */
+  .rep-staff-avatar-circle {
+    width: 28px;
+    height: 28px;
+    font-size: 0.76rem;
+  }
+
+  .rep-role-pill {
+    font-size: 0.68rem;
+    padding: 2px 6px;
+  }
+
+  .rep-staff-count-pill {
+    font-size: 0.76rem;
+  }
+
+  .rep-share-container {
+    max-width: 75px;
+  }
+
+  /* Sekme 4 & 5: Denetim ve Günlük */
+  .reports-audit-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .reports-audit-filter-bar .cat-search-pill-box {
+    max-width: 100% !important;
+    width: 100%;
+  }
+
+  .reports-audit-type-pills {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+    gap: 6px;
+    width: 100%;
+    scrollbar-width: none;
+  }
+
+  .reports-audit-type-pills::-webkit-scrollbar {
+    display: none;
+  }
+
+  .report-type-pill {
+    flex-shrink: 0;
+    padding: 6px 10px;
+    font-size: 0.76rem;
+    white-space: nowrap;
+  }
+
+  .report-table-wrapper {
+    border-radius: 12px;
+    padding: 12px;
+  }
+
+  /* Modallar & Pop-up'lar */
+  .rep-modal-backdrop,
+  .zreport-modal-backdrop {
+    padding: 8px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .rep-receipt-modal-box,
+  .customer-receipt-modal-content,
+  .zreport-modal-content {
+    width: 100%;
+    max-width: 100%;
+    max-height: 94vh;
+    border-radius: 14px;
+    margin: 0;
+  }
+
+  .rep-receipt-modal-header,
+  .zreport-modal-header {
+    padding: 10px 14px;
+  }
+
+  .rep-receipt-modal-body,
+  .zreport-modal-body {
+    padding: 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .customer-receipt-ticket {
+    max-width: 100%;
+    width: 100%;
+    padding: 14px 10px;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    box-sizing: border-box;
+  }
+
+  .rep-receipt-modal-footer,
+  .zreport-modal-footer {
+    flex-direction: column-reverse;
+    width: 100%;
+    gap: 8px;
+    padding: 10px 14px;
+    box-sizing: border-box;
+  }
+
+  .rep-receipt-print-btn,
+  .rep-receipt-close-btn,
+  .zreport-modal-footer button {
+    width: 100%;
+    justify-content: center;
+    padding: 10px 14px;
+    font-size: 0.86rem;
+    box-sizing: border-box;
+  }
+}
+
+/* 3. KÜÇÜK MOBİL EKRANLAR (<= 480px) */
+@media (max-width: 480px) {
+  .rep-nav-action-btn {
+    padding: 6px 8px;
+    font-size: 0.76rem;
+  }
+
+  .rep-pos-subcards-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .rep-pos-total-val {
+    font-size: 1.60rem;
+  }
+
+  .rep-pos-total-currency {
+    font-size: 1.20rem;
+  }
+
+  .rep-drawer-item-header,
+  .rep-drawer-item-row {
+    grid-template-columns: 1.6fr 0.7fr 1fr 1fr;
+    font-size: 0.72rem;
+  }
+}
+
+/* Müşteri Fişi Termal Bilet Stili */
+.customer-receipt-modal-content {
+  max-width: 410px;
+}
+
+.customer-receipt-header {
+  background: #0369a1;
+}
+
+.customer-receipt-ticket {
+  border: 1.5px dashed #000000;
+  padding: 22px 20px;
+  background: #ffffff;
+  border-radius: 4px;
+  font-family: 'Courier New', Courier, monospace;
+  color: #000000;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  width: 100%;
+  max-width: 340px;
+  box-sizing: border-box;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+/* Baskı (Print) Stilleri */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .zreport-ticket,
+  .zreport-ticket *,
+  .customer-receipt-ticket,
+  .customer-receipt-ticket * {
+    visibility: visible;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .zreport-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: transparent !important;
+    padding: 0 !important;
+  }
+  .zreport-modal-content,
+  .customer-receipt-modal-content {
+    box-shadow: none !important;
+    border: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+  .zreport-modal-header,
+  .zreport-modal-footer,
+  .rep-modal-close-btn {
+    display: none !important;
+  }
+  .zreport-ticket,
+  .customer-receipt-ticket {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: 80mm !important;
+    margin: 0 auto;
+    padding: 0 !important;
+    border: none !important;
+    font-weight: 800 !important;
+  }
+}

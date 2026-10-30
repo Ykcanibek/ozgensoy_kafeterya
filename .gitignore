@@ -1,0 +1,26 @@
+# Dependencies (Paketler)
+node_modules/
+*/node_modules/
+
+# Gizli Ortam Değişkenleri (.env)
+.env
+*.env
+backend/.env
+!*.env.example
+
+# Derleme ve Build Çıktıları
+dist/
+frontend/dist/
+build/
+
+# Loglar ve Hata Kayıtları
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# İşletim Sistemi ve IDE Dosyaları
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
