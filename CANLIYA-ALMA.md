@@ -1,113 +1,132 @@
-# Canlıya Alma — Veridyen VPS + ozgensoykafeterya.com
+# Canlıya Alma — Veridyen Windows Hosting (Plesk) + ozgensoykafeterya.com
 
-Sistem Veridyen'den alınan bir **sunucuda (VPS)** çalışır. Kafedeki laptop, tablet ve telefonlar yalnızca tarayıcıdan bağlanır.
-Kafede elektrik ya da internet kesilse bile veriler sunucuda güvende kalır, müşterinin QR menüsü açılmaya devam eder.
+Sistem Veridyen'deki Windows hosting'de, Plesk panelinden yönetilerek çalışır. Kafedeki laptop, tablet ve telefonlar yalnızca tarayıcıdan bağlanır.
 
-| Adres | Ne açılır | Kim kullanır |
-|---|---|---|
-| `https://panel.ozgensoykafeterya.com` | Personel paneli (giriş ekranı) | Personel |
-| `https://ozgensoykafeterya.com` | Yalnızca QR menü | Müşteri telefonları (masadaki QR) |
+| Adres | Ne açılır |
+|---|---|
+| `https://ozgensoykafeterya.com` | Personel paneli (giriş ekranı) |
+| `https://ozgensoykafeterya.com/m/<masa-anahtarı>` | Masadaki QR kodun açtığı müşteri menüsü |
 
-> Menü adresinden personel girişi ve personel API'si **kapalıdır**. Müşteri, QR adresini değiştirerek panele ulaşamaz.
+> İsterseniz paneli ayrı bir adrese (`panel.ozgensoykafeterya.com`) alıp ana adresten personel girişini tamamen kapatabilirsiniz. Bkz. **Ek: Ayrı panel adresi**.
 
 ---
 
-## 1. Veridyen'den satın alınacaklar
+## 0. Satın almadan önce Veridyen'e sorun
 
-1. **Alan adı:** `ozgensoykafeterya.com`
-2. **Sunucu:** **VPS** (sanal sunucu) paketi. En küçük paket yeterlidir: 1–2 çekirdek, **en az 2 GB RAM**, 20 GB+ disk.
-   - İşletim sistemi olarak **Ubuntu 22.04 veya 24.04** seçin.
-   - Sunucu konumu Türkiye olursa daha hızlı olur.
-   - **"Web hosting / paylaşımlı hosting / cPanel" paketi almayın.** Bu sistemde sürekli çalışan bir Node.js sunucusu, anlık bildirimler ve gece otomatik gün sonu var; paylaşımlı hosting bunları desteklemez.
-3. Satın alınca Veridyen e-postayla şu bilgileri gönderir: sunucunun **IP adresi**, kullanıcı (`root`) ve şifresi.
+Windows hosting paketinde şunların **hepsi** olmalı:
 
-## 2. Alan adını sunucuya yönlendirin (DNS)
+1. **Node.js desteği** (Plesk'te "Node.js" simgesi), **sürüm 20 veya üstü.** Olmazsa sistem çalışmaz. Bazı Windows paketlerinde yalnızca ASP.NET bulunur.
+2. **MySQL veya MariaDB** veritabanı. Yalnızca MSSQL yetmez.
+3. **Let's Encrypt** ücretsiz SSL (genelde vardır).
+4. *(İyi olur)* IIS **WebSocket** desteği. Yoksa da çalışır; anlık bildirimler biraz daha geç gelir.
+5. *(İyi olur)* Uygulama havuzunun boşta kapanmaması (**idle timeout = 0**). Gece gün sonu işlemi için gerekli değildir, ama ilk açılış hızlanır.
 
-Veridyen müşteri panelinde **Alan Adlarım → ozgensoykafeterya.com → DNS Yönetimi** bölümüne üç **A kaydı** ekleyin:
+## 1. Yayın paketini hazırlayın (bu bilgisayarda)
 
-| Ad (Host) | Tür | Değer |
-|---|---|---|
-| `@` | A | sunucunun IP adresi |
-| `www` | A | sunucunun IP adresi |
-| `panel` | A | sunucunun IP adresi |
-
-Kayıtların yayılması birkaç dakika ile birkaç saat arasında sürer. Komut isteminde `ping panel.ozgensoykafeterya.com` yazdığınızda sunucunun IP'si görünüyorsa hazırdır.
-
-## 3. Proje dosyalarını sunucuya yükleyin
-
-Veritabanı sunucuda **sıfırdan** kurulur; laptoptaki veriler (örnek satışlar, kasa kayıtları vb.) taşınmaz.
-
-**WinSCP** (ücretsiz) ile sunucuya bağlanın (IP, `root`, şifre). `/var/www/ozgensoy` klasörünü oluşturup proje dosyalarını içine kopyalayın. Şunları **kopyalamayın**:
-
-| Kopyalamayın | Neden |
-|---|---|
-| `backend/node_modules`, `frontend/node_modules`, `frontend/dist` | Sunucu kendisi kurar ve derler |
-| `backend/.env`, `frontend/.env` | Sunucu kendi ayarlarını ve şifrelerini üretir |
-| `backend/uploads` içindeki görseller, `backend/backups` | Laptoptaki deneme verilerine ait |
-| `backend/sample-*.json` | Örnek veri listeleri |
-
-## 4. Sunucuda tek komutla kurulum
-
-WinSCP'de **Komutlar → PuTTY'yi aç** seçin (ya da Windows'ta `ssh root@<IP>`). Ardından şunu çalıştırın:
+Proje klasöründe:
 
 ```
-cd /var/www/ozgensoy
-sudo bash deploy/kurulum.sh eposta@adresiniz.com
+node deploy/plesk/publish.mjs "C:\Users\İskender\Desktop\Yusuf\ozgensoy_publish"
 ```
 
-Betik sırasıyla şunları yapar:
+Bu komut arayüzü derler ve sunucuya gidecek her şeyi `ozgensoy_publish` klasörüne koyar: `web.config`, `server.cjs`, `backend`, `frontend/dist`. Yalnızca çalışma için gereken Windows paketleri de içindedir, sunucuda `npm install` gerekmez.
 
-- Node.js, MySQL ve Nginx kurar; sunucu saatini İstanbul'a ayarlar.
-- Boş veritabanını ve bu sisteme ait ayrı bir veritabanı kullanıcısını, rastgele güçlü bir şifreyle oluşturur.
-- Canlı ayarları yazar (`backend/.env`, `frontend/.env`) ve arayüzü derler.
-- Sunucu ilk açılışta bütün tabloları kendisi oluşturur. Yanında yetki rolleri, kasa defteri kategorileri, 12 masa, birkaç örnek ürün ve gizli geliştirici hesabı da gelir. Satış ve kasa kaydı olmaz.
-- **Geliştirici hesabının şifresini ekrana bir kez yazar** (`superadmin / ...`). Bu şifreyi not alın.
-- Sunucuyu **sistem hizmeti** olarak başlatır. Çökerse ya da VPS yeniden başlarsa kendiliğinden açılır.
-- **HTTPS (SSL kilidi)** sertifikasını ücretsiz Let's Encrypt'ten alır ve otomatik yeniler. E-posta adresi, sertifika süresi dolmadan gelecek uyarılar içindir.
-- Her gece **03:00'te veritabanı yedeği** alır (`backend/backups`, son 30 gün).
-- Güvenlik duvarında yalnızca SSH, HTTP ve HTTPS'i açık bırakır.
+İlk seferde `backend\.env` ayar dosyası da yazılır. İçinde rastgele bir oturum anahtarı ve **geliştirici hesabı şifresi** (`DEV_ACCOUNT_PASSWORD`) bulunur. Bu şifreyi not alın.
 
-En sonda `Kurulum tamam` yazısı çıkar.
+## 2. Veritabanını açın (Plesk)
 
-> "SSL alınamadı" yazarsa DNS kayıtları henüz yayılmamıştır. Biraz bekleyip ekrandaki `certbot` komutunu tekrar çalıştırın.
+**Plesk → Web Siteleri ve Alan Adları → Veritabanları → Veritabanı Ekle**
 
-## 5. Kontrol
+- Tür: **MySQL** (veya MariaDB)
+- Veritabanı adı, kullanıcı adı ve şifre belirleyin. Plesk ada bir önek ekleyebilir (ör. `ozgensoy_kafe`); **tam adı** not alın.
+- Sunucu adresi genelde `localhost`'tur. Plesk farklı bir adres gösteriyorsa onu kullanın.
 
-Telefonun mobil verisiyle (Wi‑Fi kapalı) deneyin:
+Sonra `ozgensoy_publish\backend\.env` dosyasını Not Defteri ile açıp doldurun:
 
-- `https://panel.ozgensoykafeterya.com` → giriş ekranı açılmalı. Kurulumun verdiği `superadmin` şifresiyle girin.
-- `https://ozgensoykafeterya.com` → "QR kodu okutun" ekranı açılmalı.
+```
+DB_HOST=localhost
+DB_USER=<Plesk'teki kullanıcı adı>
+DB_PASSWORD=<Plesk'teki şifre>
+DB_NAME=<Plesk'teki tam veritabanı adı>
+```
 
-## 6. QR kodları ve açılış
+Tabloları sizin oluşturmanız gerekmez. Uygulama ilk açıldığında bütün tabloları kendisi kurar.
 
-1. Panelden işletmeyi hazırlayın:
-   - Personel hesaplarını açın.
-   - Örnek ürünleri silin ya da düzenleyin, gerçek ürünleri ve görsellerini girin.
-   - Masaları son hâline getirin (ad/numara; varsayılan 12 masa gelir).
-2. **Masalar → QR** ekranından QR kodlarını yazdırın ve masalara yapıştırın. Bir tanesini telefonla okutup test edin.
-   - Masa adını/numarasını değiştirmek QR'ı bozmaz.
-   - **Masayı silmek** o masanın QR'ını geçersiz yapar; masaları silmeyin.
-3. Bir deneme siparişi verin: QR okut → sipariş ver → panelde onayla → mutfakta görün → hesabı kapat.
-4. Geliştirici (superadmin) ve personel şifrelerini güçlü şifrelerle değiştirin.
+## 3. Dosyaları yükleyin
 
-> Laptoptaki sistem bundan sonra kullanılmamalı. Aksi hâlde siparişler iki ayrı yere kaydedilir.
+1. `ozgensoy_publish` klasörünün **içindekileri** zip yapın: hepsini seçin → sağ tık → Gönder → Sıkıştırılmış klasör.
+2. **Plesk → Dosya Yöneticisi → httpdocs** klasörüne girin. Varsayılan dosyaları (`index.html`, `default.aspx` vb.) silin.
+3. Zip'i yükleyin, üzerine sağ tıklayıp **Arşivi Çıkar**. Sonra zip'i silin.
+4. `httpdocs` içinde şunlar görünmeli: `web.config`, `server.cjs`, `backend`, `frontend`.
 
-## Bakım
+## 4. Node.js'i açın
 
-| Ne zaman | Ne yapılır |
+**Plesk → Web Siteleri ve Alan Adları → Node.js**
+
+| Ayar | Değer |
 |---|---|
-| Kodda değişiklik geldiğinde | Dosyaları WinSCP ile yükleyin, sonra `sudo bash /var/www/ozgensoy/deploy/guncelle.sh` |
-| Sunucu durumu | `systemctl status ozgensoy` |
-| Hata kayıtları | `journalctl -u ozgensoy -n 100` |
-| Yeniden başlatma | `sudo systemctl restart ozgensoy` |
-| Elle yedek | `cd /var/www/ozgensoy/backend && sudo -u kafe node scripts/backup.js` |
-| Yedeği geri yükleme | `mysql kafe_otomasyon < backend/backups/<dosya>.sql` |
+| Node.js sürümü | 20 veya üstü (varsa 22) |
+| Belge kökü (Document Root) | `/httpdocs` |
+| Uygulama kökü (Application Root) | `/httpdocs` |
+| Uygulama başlangıç dosyası | `server.cjs` |
+| Uygulama modu | production |
 
-- **Yedekleri ara sıra sunucu dışına indirin** (WinSCP ile `backend/backups` klasöründen). Veridyen'in ücretli "VPS yedekleme" seçeneği de ek güvence sağlar.
-- Gece 00:00'dan sonra günlük ciro kasa defterine otomatik işlenir. Sunucu o saatte kapalıysa açıldığında eksik günler kendiliğinden kapatılır.
+**Node.js'i Etkinleştir** düğmesine basın.
 
-## Teknik notlar
+> Plesk bu adımda `web.config` dosyasını kendi şablonuyla değiştirebilir. Site açılmazsa, değiştirilmiş dosyadaki `nodeProcessCommandLine="..."` satırını (Node sürümünün yolu) not alın. Sonra bizim `web.config` dosyamızı tekrar yükleyin ve o satırı içindeki `<iisnode ...>` etiketine ekleyin.
 
-- Nginx yalnızca HTTPS'i karşılar ve her şeyi Node sunucusuna (`127.0.0.1:5000`) iletir (`deploy/nginx.conf`). Node, derlenmiş arayüzü (`frontend/dist`) kendisi sunar: `/m/<anahtar>` QR menüyü, diğer adresler paneli açar.
-- Menü alan adı kısıtı `backend/.env` içindeki `MENU_HOST=ozgensoykafeterya.com,www.ozgensoykafeterya.com` ayarıyla yapılır.
-- QR adresi `frontend/.env` içindeki `VITE_MENU_URL=https://ozgensoykafeterya.com` ile belirlenir. Değiştirilirse arayüz yeniden derlenmeli ve QR'lar yeniden yazdırılmalıdır.
+## 5. SSL (https)
+
+- **Plesk → SSL/TLS Sertifikaları → Let's Encrypt** ile `ozgensoykafeterya.com` ve `www` için ücretsiz sertifika alın.
+- **Barındırma Ayarları**'nda "**HTTP'den HTTPS'e kalıcı yönlendirme**" seçeneğini açın.
+
+## 6. Kontrol
+
+- `https://ozgensoykafeterya.com/api/health` adresi `"status":"ok"` göstermeli.
+- `https://ozgensoykafeterya.com` adresinde giriş ekranı açılmalı. **superadmin** kullanıcı adı ve `.env` dosyasındaki `DEV_ACCOUNT_PASSWORD` şifresiyle girin.
+- Hata olursa kayıtlar **Dosya Yöneticisi → httpdocs → iisnode** klasöründedir.
+
+## 7. Açılıştan önce
+
+1. Personel hesaplarını açın.
+2. Örnek ürünleri silin ya da düzenleyin, gerçek ürünleri ve görsellerini girin.
+3. Masaları son hâline getirin (varsayılan 12 masa gelir).
+4. **Masalar → QR** ekranından QR kodlarını yazdırıp masalara yapıştırın. Telefonla bir tanesini okutup test edin.
+   - Masa adını/numarasını değiştirmek QR'ı bozmaz. **Masayı silmek** o masanın QR'ını geçersiz yapar.
+5. Bir deneme siparişi verin: QR okut → sipariş ver → panelde onayla → mutfakta görün → hesabı kapat.
+
+## Güncelleme (kodda değişiklik olduğunda)
+
+1. Bu bilgisayarda `node deploy/plesk/publish.mjs "C:\Users\İskender\Desktop\Yusuf\ozgensoy_publish"` komutunu çalıştırın. Mevcut `.env` korunur.
+2. Klasördeki dosyaları httpdocs'a yükleyin. **`backend\.env` ve `backend\uploads` hariç**: bunlar sunucudaki ayarlar ve ürün görselleridir, üzerine yazmayın.
+3. **Plesk → Node.js → Uygulamayı Yeniden Başlat.**
+
+## Yedekleme
+
+- **Plesk → Yedekleme Yöneticisi** ile her gün otomatik yedek planlayın (dosyalar + veritabanı).
+- Ara sıra **Veritabanları → Dışa aktar** ile bilgisayarınıza da bir kopya indirin.
+
+## Paylaşımlı hosting'e özgü notlar
+
+- IIS, bir süre istek gelmeyince uygulamayı uyutabilir; ilk istek birkaç saniye sürebilir. Bu, verilere zarar vermez.
+- Gece gün sonu kaydı: Uygulama gece uyuyorsa, sabah ilk açıldığında eksik günler otomatik olarak kasa defterine işlenir. Kayıtlar yine doğru güne yazılır.
+- `web.config` içindeki `nodeProcessCountPerApplication="1"` ayarını değiştirmeyin; anlık bildirimler tek süreçle çalışır.
+- **Plesk'te aynı klasöre bakan bir "alt alan adı" (subdomain) açmayın.** İkinci bir kopya çalışır ve anlık bildirimler iki kopya arasında bölünür.
+
+## Ek: Ayrı panel adresi (isteğe bağlı)
+
+Paneli `panel.ozgensoykafeterya.com` adresine alıp ana adresi yalnızca menüye ayırmak için:
+
+1. **Plesk → Alan Adı Takma Adı Ekle (Domain Alias)** → `panel.ozgensoykafeterya.com`. Takma ad aynı uygulamayı kullanır; alt alan adı değil, **takma ad** olmalıdır.
+2. SSL sertifikasına bu adresi de ekleyin.
+3. `backend\.env` içinde şu satırı yazın ve uygulamayı yeniden başlatın:
+   ```
+   MENU_HOST=ozgensoykafeterya.com,www.ozgensoykafeterya.com
+   ```
+4. Artık `ozgensoykafeterya.com` yalnızca QR menüyü açar, personel girişi `panel.ozgensoykafeterya.com` adresinden yapılır. QR kodları değişmez.
+
+Plesk takma ad olarak `panel.` ile başlayan bir adı kabul etmezse bu adımı atlayın; sistem tek adresle sorunsuz çalışır.
+
+---
+
+Kendi Linux sunucunuza (VPS) kurmak isterseniz: `deploy/kurulum.sh` ve `DEPLOY.md`.

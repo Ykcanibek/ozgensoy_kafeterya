@@ -267,7 +267,7 @@ async function startServer() {
     await ensureThumbnails(); // Eski görsellerin küçük kopyalarını tamamla
     startDailyClosingScheduler(socketEmitter); // Gece 00:00'dan sonra önceki günün cirosu kasa defterine işlenir
     server.listen(PORT, () => {
-      console.log(`🚀 Kafe Otomasyon Backend çalışıyor: http://localhost:${PORT}`);
+      console.log(`🚀 Kafe Otomasyon Backend çalışıyor: ${/^\d+$/.test(String(PORT)) ? `http://localhost:${PORT}` : PORT}`);
     });
   } catch (error) {
     console.error('Sunucu başlatılamadı:', error.message);

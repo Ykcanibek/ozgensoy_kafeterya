@@ -1,17 +1,19 @@
 # Canlıya Alma (teknik özet)
 
-Adım adım kurulum rehberi: **[CANLIYA-ALMA.md](CANLIYA-ALMA.md)** (Veridyen Ubuntu VPS).
+Adım adım rehber: **[CANLIYA-ALMA.md](CANLIYA-ALMA.md)** (Veridyen Windows hosting / Plesk).
 
-- `deploy/kurulum.sh` — ilk kurulum (Node, MySQL, Nginx, SSL, systemd hizmeti, gece yedeği)
-- `deploy/guncelle.sh` — kod güncellemesinden sonra derle + yeniden başlat
-- `deploy/nginx.conf` — üç alan adını da Node sunucusuna (5000) ileten ters vekil ayarı
+Node sunucusu derlenmiş arayüzü (`frontend/dist`) kendisi sunar: `/m/<masa-anahtarı>` → QR menü (`menu.html`),
+diğer adresler → personel paneli (`index.html`). `MENU_HOST` verilirse o alan adında yalnızca menü ve `/api/public/*` açılır.
 
-Tek proje, tek backend, tek veritabanı; Node derlenmiş arayüzü kendisi sunar:
+## Windows hosting (Plesk, IIS + iisnode)
 
-| Adres | Ne açılır |
-|---|---|
-| `panel.ozgensoykafeterya.com` | Personel paneli (`dist/index.html`) |
-| `ozgensoykafeterya.com/m/<masa-anahtarı>` | Masaya özel QR menü (`dist/menu.html`) |
+- `deploy/plesk/publish.mjs <hedef>` — yayın klasörü: derlenmiş arayüz, sunucu kodu, çalışma paketleri, `web.config`, `server.cjs`
+- `deploy/plesk/web.config` — tüm istekleri Node'a yönlendirir, kaynak/`.env` erişimini engeller, tek süreç (socket.io)
+- `deploy/plesk/server.cjs` — iisnode başlangıç dosyası (ES modülü sunucuyu yükler; port yerine named pipe dinlenir)
+- Veritabanı panelden açılır; kullanıcının `CREATE DATABASE` yetkisi olmaması sorun değildir, tablolar ilk açılışta kurulur.
 
-`MENU_HOST` ile belirtilen menü alan adında yalnızca `/api/public/*` ve menü sayfası açılır; personel API'si 404 döner.
-Her masanın QR kodunda tahmin edilemez bir anahtar vardır. Kod kaybolur/kopyalanırsa Masalar → QR → **Kodu yenile**.
+## Linux VPS (Ubuntu)
+
+- `deploy/kurulum.sh <eposta> [yedek.sql]` — Node, MySQL, Nginx, Let's Encrypt, systemd hizmeti, gece yedeği
+- `deploy/guncelle.sh` — derle + yeniden başlat
+- `deploy/nginx.conf` — alan adlarını Node sunucusuna (5000) iletir

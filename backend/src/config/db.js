@@ -28,8 +28,16 @@ export async function createDatabaseIfNotExists() {
       password: dbConfig.password
     });
     const dbName = process.env.DB_NAME || 'kafe_otomasyon';
-    await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`);
+    try {
+      await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`);
+    } catch (error) {
+      // Paylaşımlı hosting (Plesk vb.): kullanıcının veritabanı oluşturma yetkisi yoktur; veritabanı panelden açılmıştır.
+      // Gerçekten yoksa havuz bağlantısı aşağıda açık bir hatayla durur.
+      if (!['ER_DBACCESS_DENIED_ERROR', 'ER_ACCESS_DENIED_ERROR', 'ER_SPECIFIC_ACCESS_DENIED_ERROR'].includes(error.code)) throw error;
+    }
+    const [[exists]] = await connection.query('SELECT COUNT(*) AS n FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?', [dbName]);
     await connection.end();
+    if (!exists.n) throw new Error(`'${dbName}' veritabanı yok ve bu kullanıcı oluşturamıyor. Barındırma panelinden oluşturup DB_NAME'e yazın.`);
     console.log(`[MySQL] Veritabanı '${dbName}' hazır.`);
   } catch (error) {
     console.error('[MySQL] Veritabanı oluşturma/bağlantı hatası:', error.message);
