@@ -1,5 +1,4 @@
 import multer from 'multer';
-import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -10,8 +9,22 @@ const __dirname = path.dirname(__filename);
 // Uploads ana dizini
 const uploadsDir = path.resolve(__dirname, '../../uploads');
 
-// Sharp'ın dosya önbelleği kapalı: açık kalan dosya tutamaçları Windows'ta görsellerin silinmesini (EBUSY) engelliyordu
-sharp.cache(false);
+// Görsel işleme kütüphanesi (sharp) ilk kullanımda yüklenir: sunucuda yüklenemezse (ör. eski Linux) yalnızca görsel
+// yükleme hata verir, sistemin geri kalanı çalışmaya devam eder.
+let sharpModule;
+const loadSharp = async () => {
+  if (!sharpModule) {
+    try {
+      sharpModule = (await import('sharp')).default;
+    } catch (error) {
+      console.error('[Görsel] sharp yüklenemedi:', error.message);
+      throw new Error('Görsel işleme bu sunucuda kullanılamıyor; yöneticinize bildirin.');
+    }
+    // Dosya önbelleği kapalı: açık kalan dosya tutamaçları Windows'ta görsellerin silinmesini (EBUSY) engelliyordu
+    sharpModule.cache(false);
+  }
+  return sharpModule;
+};
 
 /**
  * Görsel boyutları (kare, 1:1). Ana görsel önizleme ve büyük gösterimler için,
@@ -57,7 +70,7 @@ export const uploadMiddleware = multer({
 /** '/uploads/x/y.webp' -> '/uploads/x/y-sm.webp' */
 export const thumbUrlOf = (imageUrl) => imageUrl.replace(/\.webp$/, `${THUMB_SUFFIX}.webp`);
 
-const pipelineFor = (input) => sharp(input, { failOn: 'error', limitInputPixels: MAX_INPUT_PIXELS })
+const pipelineFor = (sharp, input) => sharp(input, { failOn: 'error', limitInputPixels: MAX_INPUT_PIXELS })
   .rotate(); // Telefon fotoğraflarının EXIF yönünü uygula (yan/ters görünmesin); meta veri (konum vb.) atılır
 
 const writeSquare = (pipeline, size, quality, filepath) => pipeline
@@ -74,6 +87,7 @@ const writeSquare = (pipeline, size, quality, filepath) => pipeline
  */
 export async function optimizeAndSaveImage(buffer, subfolder = 'categories') {
   // Dosya gerçekten okunabilir bir görsel mi? (uzantısı değiştirilmiş dosyalar burada elenir)
+  const sharp = await loadSharp();
   let meta;
   try {
     meta = await sharp(buffer, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
@@ -90,7 +104,7 @@ export async function optimizeAndSaveImage(buffer, subfolder = 'categories') {
   const mainPath = path.join(targetDir, `${base}.webp`);
   const thumbPath = path.join(targetDir, `${base}${THUMB_SUFFIX}.webp`);
 
-  const pipeline = pipelineFor(buffer);
+  const pipeline = pipelineFor(sharp, buffer);
   try {
     await Promise.all([
       writeSquare(pipeline, IMAGE_SIZE, 80, mainPath),
@@ -132,6 +146,7 @@ export function removeUploadedImage(imageUrl) {
  */
 export async function ensureThumbnails() {
   let created = 0;
+  let sharp;
   for (const sub of ['products', 'categories']) {
     const dir = ensureUploadsDir(sub);
     for (const name of fs.readdirSync(dir)) {
@@ -139,8 +154,9 @@ export async function ensureThumbnails() {
       const thumbPath = path.join(dir, name.replace(/\.webp$/, `${THUMB_SUFFIX}.webp`));
       if (fs.existsSync(thumbPath)) continue;
       try {
+        sharp ??= await loadSharp();
         // Dosya önce belleğe okunur; sharp kaynak dosyayı açık tutmaz
-        await writeSquare(pipelineFor(fs.readFileSync(path.join(dir, name))), THUMB_SIZE, 74, thumbPath);
+        await writeSquare(pipelineFor(sharp, fs.readFileSync(path.join(dir, name))), THUMB_SIZE, 74, thumbPath);
         created += 1;
       } catch (e) {
         console.warn(`[Görsel] Küçük kopya oluşturulamadı (${name}):`, e.message);
