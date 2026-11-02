@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { thumbSrc, handleThumbError, prepareImageForUpload } from '../lib/images';
+import { useToast } from './ui/ToastProvider';
+import { useAuth } from '../context/AuthContext';
+import { apiFetch, createSocket } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
-import { io } from 'socket.io-client';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
 import HistoryModal from './HistoryModal';
@@ -38,6 +41,12 @@ import {
 } from 'lucide-react';
 
 export default function Products() {
+  const { can } = useAuth();
+  // Ürün sayfası yetkileri (sunucu ayrıca uygular)
+  const canCreateProduct = can('products.create');
+  const canEditProduct = can('products.edit');
+  const canChangePrice = can('products.price');
+  const canViewCost = can('products.view_cost');
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -91,13 +100,9 @@ export default function Products() {
   });
 
   // Bildirim Toast mesajı ({ message, type: 'success' | 'danger' | 'info' })
-  const [toast, setToast] = useState(null);
   const fileInputRef = useRef(null);
 
-  const showToast = (message, type = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3200);
-  };
+  const { showToast } = useToast(); // Global bildirimler (üst ortada, türe göre)
 
   // Excel Dışa Aktarma Modalı Aç (Tüm kategoriler varsayılan seçili gelir)
   const handleOpenExportModal = () => {
@@ -137,7 +142,7 @@ export default function Products() {
       setIsExporting(true);
       showToast('Excel dosyası hazırlanıyor...', 'info');
 
-      const response = await fetch('/api/products/export-excel', {
+      const response = await apiFetch('/api/products/export-excel', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -176,7 +181,7 @@ export default function Products() {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/products');
+      const res = await apiFetch('/api/products');
       const data = await res.json();
       if (data.success) {
         setProducts(data.products || []);
@@ -192,7 +197,7 @@ export default function Products() {
   // Aktif kategorileri sunucudan getir (Dropdown ve Filtre için)
   const fetchCategories = async () => {
     try {
-      const res = await fetch('/api/categories');
+      const res = await apiFetch('/api/categories');
       const data = await res.json();
       if (data.success) {
         setCategories(data.categories || []);
@@ -207,7 +212,7 @@ export default function Products() {
     fetchProducts();
     fetchCategories();
 
-    const socket = io();
+    const socket = createSocket();
 
     socket.on('product:created', (newProd) => {
       setProducts(prev => {
@@ -266,7 +271,7 @@ export default function Products() {
     setHistoryModalProduct(prod);
     setHistoryLoading(true);
     try {
-      const res = await fetch(`/api/products/${prod.id}/history`);
+      const res = await apiFetch(`/api/products/${prod.id}/history`);
       const data = await res.json();
       if (data.success) {
         setProductHistory(data.history || []);
@@ -326,7 +331,7 @@ export default function Products() {
     setImagePreview(null);
   };
 
-  // Görsel Seçimi (Sharp ile backendde 500x500 WebP yapılacak)
+  // Görsel Seçimi (gönderirken tarayıcıda küçültülür; sunucu 640px ve 320px kare WebP üretir)
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -390,7 +395,7 @@ export default function Products() {
       formData.append('status', formStatus.toString());
 
       if (imageFile) {
-        formData.append('image', imageFile);
+        formData.append('image', await prepareImageForUpload(imageFile)); // Büyük fotoğraf tarayıcıda küçültülür
       }
 
       if (modalMode === 'edit') {
@@ -398,10 +403,8 @@ export default function Products() {
           formData.append('remove_image', 'true');
         }
 
-        const token = localStorage.getItem('kafe_token');
-        const res = await fetch(`/api/products/${selectedProduct.id}`, {
+        const res = await apiFetch(`/api/products/${selectedProduct.id}`, {
           method: 'PUT',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
           body: formData
         });
         const data = await res.json();
@@ -414,10 +417,8 @@ export default function Products() {
         }
       } else {
         // Yeni Ürün Ekle
-        const token = localStorage.getItem('kafe_token');
-        const res = await fetch('/api/products', {
+        const res = await apiFetch('/api/products', {
           method: 'POST',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
           body: formData
         });
         const data = await res.json();
@@ -446,10 +447,8 @@ export default function Products() {
     setProducts(prev => prev.map(p => p.id === product.id ? { ...p, status: nextStatus, is_available: nextStatus } : p));
 
     try {
-      const token = localStorage.getItem('kafe_token');
-      const res = await fetch(`/api/products/${product.id}/status`, {
-        method: 'PATCH',
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      const res = await apiFetch(`/api/products/${product.id}/status`, {
+        method: 'PATCH'
       });
       const data = await res.json();
       if (data.success) {
@@ -481,13 +480,9 @@ export default function Products() {
     setProducts(prev => prev.map(p => p.id === product.id ? { ...p, show_in_qr: nextQr } : p));
 
     try {
-      const token = localStorage.getItem('kafe_token');
-      const res = await fetch(`/api/products/${product.id}/qr-status`, {
+      const res = await apiFetch(`/api/products/${product.id}/qr-status`, {
         method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ show_in_qr: nextQr })
       });
       const data = await res.json();
@@ -513,14 +508,12 @@ export default function Products() {
 
     try {
       setIsDeleting(true);
-      const token = localStorage.getItem('kafe_token');
-      const res = await fetch(`/api/products/${deleteModalProduct.id}`, {
-        method: 'DELETE',
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      const res = await apiFetch(`/api/products/${deleteModalProduct.id}`, {
+        method: 'DELETE'
       });
       const data = await res.json();
       if (data.success) {
-        showToast(`"${deleteModalProduct.name}" silindi.`, 'danger');
+        showToast(`"${deleteModalProduct.name}" silindi.`, 'deleted');
         setDeleteModalProduct(null);
         fetchProducts();
       } else {
@@ -574,13 +567,9 @@ export default function Products() {
 
     try {
       setIsReordering(true);
-      const token = localStorage.getItem('kafe_token');
-      const res = await fetch('/api/products/reorder', {
+      const res = await apiFetch('/api/products/reorder', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderedIds })
       });
       const data = await res.json();
@@ -649,6 +638,7 @@ export default function Products() {
         }
         actions={
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {can('products.export') && (
             <button
               type="button"
               onClick={handleOpenExportModal}
@@ -664,7 +654,9 @@ export default function Products() {
               <FileSpreadsheet size={16} />
               <span>Dışa Aktar</span>
             </button>
+            )}
 
+            {canCreateProduct && (
             <button
               type="button"
               onClick={handleOpenAddModal}
@@ -679,6 +671,7 @@ export default function Products() {
               <Plus size={16} />
               <span>Yeni Ürün</span>
             </button>
+            )}
           </div>
         }
       />
@@ -746,6 +739,7 @@ export default function Products() {
           <h3>{searchQuery || selectedCategoryFilter !== 'all' ? 'Aramanızla eşleşen ürün bulunamadı' : 'Henüz hiç ürün eklenmemiş'}</h3>
           <p>{searchQuery || selectedCategoryFilter !== 'all' ? 'Farklı bir arama terimi veya kategori filtresi deneyin.' : 'Menünüzü oluşturmak için hemen ilk ürününüzü ekleyin.'}</p>
           {!searchQuery && selectedCategoryFilter === 'all' && (
+            <>{canCreateProduct && (
             <button
               type="button"
               onClick={handleOpenAddModal}
@@ -754,6 +748,7 @@ export default function Products() {
               <Plus size={18} />
               <span>İlk Ürünü Ekle</span>
             </button>
+            )}</>
           )}
         </div>
       ) : (
@@ -782,9 +777,9 @@ export default function Products() {
                   <div 
                     className="cat-drag-handle" 
                     title="Sırasını değiştirmek için buradan basılı tutup sürükleyin"
-                    onMouseDown={() => setDragAllowedId(prod.id)}
+                    onMouseDown={() => canEditProduct && setDragAllowedId(prod.id)}
                     onMouseUp={() => setDragAllowedId(null)}
-                    onTouchStart={() => setDragAllowedId(prod.id)}
+                    onTouchStart={() => canEditProduct && setDragAllowedId(prod.id)}
                     onTouchEnd={() => setDragAllowedId(null)}
                   >
                     <GripVertical size={18} />
@@ -795,17 +790,12 @@ export default function Products() {
                   <div className="cat-thumb-wrapper">
                     {prod.image_url ? (
                       <img
-                        src={prod.image_url}
+                        src={thumbSrc(prod.image_url)}
                         alt={prod.name}
                         className="cat-thumb-img"
                         loading="lazy"
                         decoding="async"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          if (e.currentTarget.nextSibling) {
-                            e.currentTarget.nextSibling.style.display = 'flex';
-                          }
-                        }}
+                        onError={(e) => handleThumbError(e, prod.image_url)}
                       />
                     ) : null}
                     <div 
@@ -862,6 +852,7 @@ export default function Products() {
                         type="button"
                         className={`cat-qr-btn ${isPassive ? 'disabled' : isQrOn ? 'active' : 'inactive'}`}
                         onClick={(e) => handleToggleQrStatus(prod, e)}
+                        disabled={!canEditProduct}
                         title={
                           isPassive
                             ? 'Ürün pasif olduğu için QR menüde kapalıdır (Önce ürünü aktif yapın)'
@@ -887,6 +878,7 @@ export default function Products() {
                       <input
                         type="checkbox"
                         checked={prod.status === 1}
+                        disabled={!canEditProduct}
                         onChange={(e) => handleToggleStatus(prod, e)}
                       />
                       <span className="cat-slider"></span>
@@ -897,6 +889,7 @@ export default function Products() {
                   </div>
 
                   {/* Düzenle Butonu */}
+                  {canEditProduct && (
                   <button
                     type="button"
                     className="cat-action-btn edit"
@@ -906,6 +899,7 @@ export default function Products() {
                     <Edit3 size={15} />
                     <span>Düzenle</span>
                   </button>
+                  )}
 
                   {/* Geçmiş Butonu */}
                   <button
@@ -919,6 +913,7 @@ export default function Products() {
                   </button>
 
                   {/* Sil Butonu */}
+                  {can('products.delete') && (
                   <button
                     type="button"
                     className="cat-action-btn delete"
@@ -928,6 +923,7 @@ export default function Products() {
                     <Trash2 size={15} />
                     <span>Sil</span>
                   </button>
+                  )}
                 </div>
               </div>
             );
@@ -1068,11 +1064,14 @@ export default function Products() {
                       placeholder="0.00"
                       value={formPrice}
                       onChange={(e) => setFormPrice(e.target.value)}
+                      disabled={Boolean(selectedProduct) && !canChangePrice}
+                      title={selectedProduct && !canChangePrice ? 'Satış fiyatını değiştirme yetkiniz yok' : ''}
                       required
                     />
                   </div>
                 </div>
 
+                {canViewCost && (
                 <div className="cat-form-group" style={{ marginBottom: 0 }}>
                   <label className="cat-form-label">
                     Ürün Maliyeti (₺) <span style={{ fontSize: '0.74rem', color: '#486b78', fontWeight: 'normal' }}>(İsteğe Bağlı)</span>
@@ -1090,6 +1089,7 @@ export default function Products() {
                     />
                   </div>
                 </div>
+                )}
               </div>
 
               {/* 3. Satır: Kısa Açıklama (İsteğe Bağlı) */}
@@ -1370,6 +1370,7 @@ export default function Products() {
                   </label>
 
                   {/* Maliyet Fiyatı */}
+                  {canViewCost && (
                   <label className={`export-check-card ${exportSelectedColumns.cost_price ? 'checked' : ''}`}>
                     <div className="export-check-left">
                       <input 
@@ -1382,6 +1383,7 @@ export default function Products() {
                     </div>
                     <span className="export-badge-tag highlight">Özel</span>
                   </label>
+                  )}
 
                   {/* QR Menü Durumu */}
                   <label className={`export-check-card ${exportSelectedColumns.show_in_qr ? 'checked' : ''}`}>
@@ -1491,17 +1493,6 @@ export default function Products() {
         onRefresh={() => historyModalProduct && handleOpenHistoryModal(historyModalProduct)}
       />
 
-      {/* Toast Bildirim Kutusu (Duruma Özel Renkler & Simgeler) */}
-      {toast && (
-        <div className={`cat-toast ${toast.type || 'info'}`}>
-          <div className="cat-toast-icon">
-            {toast.type === 'success' && <CheckCircle2 size={20} color="#4ade80" />}
-            {toast.type === 'danger' && <Trash2 size={20} color="#f87171" />}
-            {toast.type === 'info' && <Sparkles size={20} color="#e5a968" />}
-          </div>
-          <span>{toast.message}</span>
-        </div>
-      )}
     </div>
   );
 }

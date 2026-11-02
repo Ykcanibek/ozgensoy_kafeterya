@@ -1,36 +1,13 @@
 import { pool } from './db.js';
-import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'secret_key_kafe_2026';
 
 /**
- * Request'ten kullanıcı bilgisini (JWT token veya fallback body) çıkarır
+ * İşlemi yapan kullanıcıyı döndürür. requireAuth ara katmanının doğruladığı req.user kullanılır;
+ * istek gövdesindeki user_id / user_name gibi alanlara güvenilmez (başkası adına kayıt atılmasını önler).
  */
 export const getUserFromReq = (req) => {
-  try {
-    const authHeader = req.headers?.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
-      const decoded = jwt.verify(token, JWT_SECRET);
-      return {
-        id: decoded.id,
-        name: decoded.name || decoded.username,
-        role: decoded.role
-      };
-    }
-  } catch (e) {
-    // Token geçersizse veya yoksa devam et
+  if (req.user) {
+    return { id: req.user.id, name: req.user.name, role: req.user.role };
   }
-
-  // Fallback: body veya query üzerinden gelen user bilgisi
-  if (req.body?.user_id || req.body?.user_name) {
-    return {
-      id: req.body.user_id ? parseInt(req.body.user_id, 10) : null,
-      name: req.body.user_name || 'Personel',
-      role: req.body.user_role || 'staff'
-    };
-  }
-
   return { id: null, name: 'Sistem / Anonim', role: 'system' };
 };
 

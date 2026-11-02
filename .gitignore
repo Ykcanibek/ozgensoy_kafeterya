@@ -24,3 +24,15 @@ yarn-error.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# Yüklenen ürün/kategori görselleri (sunucuya özel veri; kodla birlikte paylaşılmaz)
+backend/uploads/
+
+# Veritabanı yedekleri (npm --prefix backend run backup)
+backend/backups/
+
+# Kasa defteri örnek veri kayıt numaraları (temizlemek için)
+backend/sample-cashbook-ids.json
+
+# Örnek satış kayıt numaraları (temizlemek için)
+backend/sample-sales-ids.json

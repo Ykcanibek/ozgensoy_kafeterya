@@ -8,9 +8,6 @@ import {
   Eye, 
   EyeOff, 
   ArrowRight, 
-  ShieldCheck, 
-  ChefHat, 
-  Receipt,
   AlertCircle,
   Sparkles
 } from 'lucide-react';
@@ -25,20 +22,22 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Sayfa açıldığında daha önce kaydedilmiş kullanıcı bilgilerini getir
+  // Sayfa açıldığında daha önce hatırlanan kullanıcı adını getir.
+  // Şifre güvenlik nedeniyle saklanmaz; eski sürümlerin kaydettiği şifre burada silinir.
   useEffect(() => {
-    const savedData = localStorage.getItem('kafe_remember_user');
-    if (savedData) {
-      try {
-        const parsed = JSON.parse(savedData);
-        if (parsed.username && parsed.password) {
-          setUsername(parsed.username);
-          setPassword(parsed.password);
-          setRememberMe(true);
-        }
-      } catch (e) {
-        console.error('Kayıtlı bilgiler okunamadı:', e);
+    try {
+      const savedData = localStorage.getItem('kafe_remember_user');
+      if (!savedData) return;
+      const parsed = JSON.parse(savedData);
+      if (parsed.password !== undefined) {
+        localStorage.setItem('kafe_remember_user', JSON.stringify({ username: parsed.username }));
       }
+      if (parsed.username) {
+        setUsername(parsed.username);
+        setRememberMe(true);
+      }
+    } catch {
+      localStorage.removeItem('kafe_remember_user');
     }
   }, []);
 
@@ -54,23 +53,17 @@ export default function Login() {
 
     const res = await login(username, password);
     if (res.success) {
-      // Beni Hatırla seçiliyse bilgileri kaydet, seçili değilse temizle
+      // Beni Hatırla seçiliyse yalnızca kullanıcı adını kaydet, seçili değilse temizle
       if (rememberMe) {
-        localStorage.setItem('kafe_remember_user', JSON.stringify({ username, password }));
+        localStorage.setItem('kafe_remember_user', JSON.stringify({ username }));
       } else {
         localStorage.removeItem('kafe_remember_user');
       }
-      navigate('/pos');
+      navigate('/');
     } else {
       setError(res.message);
     }
     setLoading(false);
-  };
-
-  const fillCredentials = (u, p) => {
-    setUsername(u);
-    setPassword(p);
-    setError('');
   };
 
   return (
@@ -143,7 +136,7 @@ export default function Login() {
               <input
                 type="text"
                 className="cafe-input"
-                placeholder="Örn: admin, kasa, mutfak"
+                placeholder="Kullanıcı adınızı girin"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 autoComplete="username"
@@ -153,7 +146,7 @@ export default function Login() {
           </div>
 
           {/* Şifre */}
-          <div className="cafe-input-wrapper" style={{ marginBottom: '24px' }}>
+          <div className="cafe-input-wrapper" style={{ marginBottom: '4px' }}>
             <label className="cafe-label">Şifre</label>
             <div style={{ position: 'relative' }}>
               <Lock 
@@ -242,47 +235,6 @@ export default function Login() {
             )}
           </button>
         </form>
-
-        {/* Hızlı Rol Seçimi (Sadeleştirilmiş) */}
-        <div style={{
-          borderTop: '1px solid #cce2e9',
-          paddingTop: '18px'
-        }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-            <button
-              type="button"
-              className="role-pill"
-              onClick={() => fillCredentials('admin', 'admin123')}
-              style={{ justifyContent: 'center' }}
-              title="Admin olarak doldur"
-            >
-              <ShieldCheck size={15} color="#3d778c" />
-              <span>Admin</span>
-            </button>
-
-            <button
-              type="button"
-              className="role-pill"
-              onClick={() => fillCredentials('kasa', 'kasa123')}
-              style={{ justifyContent: 'center' }}
-              title="Kasa olarak doldur"
-            >
-              <Receipt size={15} color="#70877f" />
-              <span>Kasa</span>
-            </button>
-
-            <button
-              type="button"
-              className="role-pill"
-              onClick={() => fillCredentials('mutfak', 'mutfak123')}
-              style={{ justifyContent: 'center' }}
-              title="Mutfak olarak doldur"
-            >
-              <ChefHat size={15} color="#c67d5a" />
-              <span>Mutfak</span>
-            </button>
-          </div>
-        </div>
 
       </div>
     </div>

@@ -1,0 +1,294 @@
+/* ======================================================== */
+/* 5. RAPORLAR VE DENETİM MERKEZİ (REPORTS DASHBOARD)       */
+/* ======================================================== */
+
+.reports-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.reports-date-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #dbe9ee;
+  padding: 5px;
+  border-radius: 12px;
+  border: 1px solid #b6ced6;
+  flex-wrap: wrap;
+}
+
+.report-date-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #346c80;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.report-date-pill:hover {
+  background: #cce2e9;
+}
+
+.report-date-pill.active {
+  background: #346c80;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(52, 108, 128, 0.25);
+}
+
+.reports-custom-date-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.report-date-input {
+  padding: 6px 10px;
+  border: 1px solid #b6ced6;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-family: inherit;
+  color: #1e292d;
+  background: #ffffff;
+}
+
+.reports-nav-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 2px solid #b6ced6;
+  margin-bottom: 22px;
+  overflow-x: auto;
+}
+
+.report-nav-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 18px;
+  border: none;
+  background: transparent;
+  color: #486b78;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.report-nav-tab:hover {
+  color: #1b414f;
+}
+
+.report-nav-tab.active {
+  color: #346c80;
+  border-bottom-color: #346c80;
+}
+
+.reports-content-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* KPI Kartları Izgarası */
+.reports-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.report-kpi-card {
+  background: #ffffff;
+  border: 1px solid #b6ced6;
+  border-radius: 16px;
+  padding: 18px 20px;
+  box-shadow: 0 2px 10px rgba(27, 65, 79, 0.04);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.report-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(27, 65, 79, 0.08);
+}
+
+.report-kpi-card.highlight {
+  border-color: #b8e2c3;
+  background: linear-gradient(135deg, #ffffff 0%, #f4fbf6 100%);
+}
+
+.report-kpi-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.report-kpi-title {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #486b78;
+}
+
+.report-kpi-icon-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.report-kpi-value {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #1e292d;
+  line-height: 1.2;
+  margin-bottom: 6px;
+}
+
+.report-kpi-sub {
+  font-size: 0.76rem;
+  color: #5d818f;
+  font-weight: 500;
+}
+
+.report-info-banner {
+  background: #dbe9ee;
+  border: 1px solid #b6ced6;
+  border-left: 4px solid #346c80;
+  padding: 14px 18px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.88rem;
+}
+
+/* Tablolar */
+.report-table-wrapper {
+  background: #ffffff;
+  border: 1px solid #b6ced6;
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(27, 65, 79, 0.04);
+  overflow: hidden;
+}
+
+.report-table-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #cce2e9;
+  background: #f8fbfc;
+}
+
+.report-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.report-data-table th {
+  background: #dbe9ee;
+  color: #346c80;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #cce2e9;
+  white-space: nowrap;
+}
+
+.report-data-table td {
+  padding: 13px 16px;
+  border-bottom: 1px solid #f5ede6;
+  font-size: 0.88rem;
+  color: #1e292d;
+}
+
+.report-data-table tbody tr:hover {
+  background: #dbe9ee;
+}
+
+.report-user-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #346c80;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.report-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+/* Denetim Günlüğü Filtre Çubuğu */
+.reports-audit-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.reports-audit-type-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.report-type-pill {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #b6ced6;
+  background: #ffffff;
+  color: #346c80;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.report-type-pill:hover {
+  background: #d3e5eb;
+}
+
+.report-type-pill.active {
+  background: #346c80;
+  border-color: #346c80;
+  color: #ffffff;
+}
+
+.cat-spin {
+  animation: catSpin 0.8s linear infinite;
+}
+
+@keyframes catSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

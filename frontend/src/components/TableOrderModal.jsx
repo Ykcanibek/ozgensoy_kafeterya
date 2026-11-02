@@ -1,47 +1,48 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { io } from 'socket.io-client';
-import {
-  X,
-  Search,
-  Plus,
-  Minus,
-  Trash2,
-  Printer,
-  Receipt,
-  Utensils,
-  Coffee,
-  CheckCircle2,
-  CreditCard,
-  Banknote,
-  Split,
-  ArrowLeftRight,
-  ChevronUp,
-  ChevronDown,
-  AlertCircle,
-  Sparkles,
-  ShoppingBag,
-  Percent,
-  Check,
-  Pencil,
-  Gift,
-  RotateCcw,
-  Ban,
-  MoreHorizontal,
-  Coins,
-  UserCheck,
-  Calculator,
-  Clock,
-  UserPlus,
-  User,
-  Phone,
-  FileText
-} from 'lucide-react';
-import { toTitleCaseTr, formatLeadingZeroPhone } from './Customers';
+import { useToast } from './ui/ToastProvider';
+import { useConfirm } from './ui/ConfirmProvider';
+import useQrRequests from './qr/useQrRequests';
+import QrRequestList from './qr/QrRequestList';
+import { apiFetch, createSocket } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
+import { X, CheckCircle2, AlertCircle, Sparkles, QrCode } from 'lucide-react';
+import CustomerDropdown from './tableOrder/CustomerDropdown';
+import OrderSidebar from './tableOrder/OrderSidebar';
+import MenuTab from './tableOrder/MenuTab';
+import BillTab from './tableOrder/BillTab';
+import CartPanel from './tableOrder/CartPanel';
+import PaymentPanel from './tableOrder/PaymentPanel';
+import ReceiptPreviewModal from './tableOrder/ReceiptPreviewModal';
+import StatusSplitModal from './tableOrder/StatusSplitModal';
+import TableTransferModal from './tableOrder/TableTransferModal';
+import MobileCartDrawer from './tableOrder/MobileCartDrawer';
+import QuickCustomerModal from './tableOrder/QuickCustomerModal';
 import './customers.css';
 
-export default function TableOrderModal({ table, onClose, onTableUpdated }) {
-  // Aktif Sekme: 'order' (Menü & Sipariş) | 'payment' (Hesap Ödeme)
-  const [activeTab, setActiveTab] = useState('order');
+export default function TableOrderModal({ table, onClose, onTableUpdated, onTableSwitched }) {
+  const { user, can, canAny } = useAuth();
+
+  // Bu pencerede kullanılan yetkiler (sunucu aynı kuralları ayrıca uygular)
+  const perms = useMemo(() => ({
+    order: can('pos.order'),
+    deliver: canAny(['pos.deliver', 'kitchen.update']),
+    transfer: can('pos.transfer'),
+    cancel: can('pos.cancel'),
+    return: can('pos.return'),
+    treat: can('pos.treat'),
+    closeEmpty: can('pos.close_empty'),
+    payView: can('payment.view'),
+    cashCard: can('payment.cash_card'),
+    split: can('payment.split'),
+    veresiye: can('payment.veresiye'),
+    discount: can('payment.discount'),
+    tip: can('payment.tip'),
+    customerCreate: can('customers.create'),
+    maxDiscountPercent: user?.role === 'admin' ? null : (user?.max_discount_percent ?? null)
+  }), [user, can, canAny]);
+
+  // Aktif Sekme: 'order' (Menü & Sipariş) | 'payment' (Hesap Ödeme) — sipariş yetkisi yoksa hesap sekmesiyle açılır
+  const [activeTab, setActiveTab] = useState(() => (can('pos.order') ? 'order' : 'payment'));
 
   // API Verileri
   const [categories, setCategories] = useState([]);
@@ -142,6 +143,22 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
     setDragOffsetY(0);
   };
 
+  // Pencereyi kapat: sepette mutfağa gönderilmemiş ürün varsa önce onay iste (yanlışlıkla kaybolmasın)
+  const requestClose = async () => {
+    if (cartItems.length > 0) {
+      const count = cartItems.reduce((s, i) => s + i.quantity, 0);
+      const ok = await confirm({
+        title: 'Sepet gönderilmedi',
+        message: `Sepette mutfağa gönderilmemiş ${count} ürün var. Kapatırsanız bu ürünler silinecek.`,
+        confirmLabel: 'Sepeti silip kapat',
+        cancelLabel: 'Geri dön',
+        danger: true
+      });
+      if (!ok) return;
+    }
+    onClose();
+  };
+
   // Modal / Çekmece Kapatma Kontrolü (Sepet açıkken masalara atmasın, sadece çekmeceyi kapatıp menüye dönsün)
   const handleModalClose = (e) => {
     if (e && e.stopPropagation) e.stopPropagation();
@@ -150,24 +167,31 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
       setDragOffsetY(0);
       return;
     }
-    onClose();
+    requestClose();
   };
 
-  // Escape tuşu ile önce sepeti, sonra modalı kapatma
+  // Escape: önce en üstteki iç pencere/menü kapanır, sonra sepet çekmecesi, en son masa penceresi
+  const escapeRef = useRef(null);
+  escapeRef.current = () => {
+    if (statusPrompt) return setStatusPrompt(null);
+    if (showQuickAddCustomerModal) return setShowQuickAddCustomerModal(false);
+    if (showTransferModal) return setShowTransferModal(false);
+    if (showReceiptPreview) return setShowReceiptPreview(false);
+    if (actionDropdownItemId !== null) return setActionDropdownItemId(null);
+    if (isMobileCartDrawerOpen) {
+      setIsMobileCartDrawerOpen(false);
+      setDragOffsetY(0);
+      return undefined;
+    }
+    return requestClose();
+  };
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        if (isMobileCartDrawerOpen) {
-          setIsMobileCartDrawerOpen(false);
-          setDragOffsetY(0);
-        } else {
-          onClose();
-        }
-      }
+      if (e.key === 'Escape') escapeRef.current?.();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isMobileCartDrawerOpen, onClose]);
+  }, []);
 
   // Hesap Ödeme Sekmesi İçin Seçili Ürün ID'leri (Checkbox)
   const [selectedItemIds, setSelectedItemIds] = useState([]);
@@ -178,6 +202,7 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
   // Durum Değiştirme (İşlem) Menüsü & Çoklu Adet Bölme Modalı
   const [actionDropdownItemId, setActionDropdownItemId] = useState(null);
   const [statusPrompt, setStatusPrompt] = useState(null); // { item, targetStatus }
+  const [showTransferModal, setShowTransferModal] = useState(false); // Masa taşıma / birleştirme penceresi
 
   // Ödeme ve Tahsilat Değerleri
   const [paymentsList, setPaymentsList] = useState([]); // Masanın önceki tahsilat kayıtları
@@ -186,7 +211,6 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
   const [tipAmount, setTipAmount] = useState(0); // Bahşiş
   const [discountAmount, setDiscountAmount] = useState(0); // İndirim
   const [paymentMethod, setPaymentMethod] = useState(null); // 'cash' | 'credit_card' | 'mixed' | 'veresiye' | null (varsayılan olarak boş gelir)
-  const [cashGiven, setCashGiven] = useState(''); // Müşteriden alınan nakit (para üstü hesabı)
   const [mixedCash, setMixedCash] = useState(''); // Parçalı ödemede nakit kısmı
   const [mixedCard, setMixedCard] = useState(''); // Parçalı ödemede kart kısmı
   const [mixedVeresiye, setMixedVeresiye] = useState(''); // Parçalı ödemede veresiye kısmı
@@ -222,8 +246,7 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
 
   const fetchRegisteredCustomers = async () => {
     try {
-      const token = localStorage.getItem('kafe_token');
-      const res = await fetch('/api/customers', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      const res = await apiFetch('/api/customers');
       const data = await res.json();
       if (data.success && Array.isArray(data.customers)) {
         setRegisteredCustomers(data.customers);
@@ -270,13 +293,9 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
     try {
       setIsSubmittingQuickCust(true);
       setQuickCustError('');
-      const token = localStorage.getItem('kafe_token');
-      const res = await fetch('/api/customers', {
+      const res = await apiFetch('/api/customers', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: quickCustName.trim(),
           phone: quickCustPhone,
@@ -307,16 +326,15 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
   // İşlem Durumları
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
-  const [toast, setToast] = useState(null);
 
   // Fiş Yazdırma Önizleme Modalı
   const [showReceiptPreview, setShowReceiptPreview] = useState(false);
 
-  // Toast Bildirimi
-  const showToast = (message, type = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
+  const { showToast } = useToast(); // Global bildirimler (üst ortada, türe göre)
+  const confirm = useConfirm(); // Uygulama tasarımında onay penceresi
+
+  // Bu masadan gelen, onay bekleyen QR menü siparişleri (onaylanınca adisyona eklenir)
+  const { requests: tableQrRequests, reload: reloadTableQr } = useQrRequests({ tableId: table.id, enabled: perms.payView || perms.order });
 
   // Scroll kilidi
   useEffect(() => {
@@ -348,9 +366,9 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
       try {
         setLoading(true);
         const [catRes, prodRes, orderRes] = await Promise.all([
-          fetch('/api/categories'),
-          fetch('/api/products'),
-          fetch(`/api/orders/table/${table.id}`)
+          apiFetch('/api/categories'),
+          apiFetch('/api/products'),
+          apiFetch(`/api/orders/table/${table.id}`)
         ]);
 
         const catData = await catRes.json();
@@ -389,15 +407,17 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
     fetchData();
 
     // Socket.io Gerçek Zamanlı Dinleme
-    const socket = io();
+    const socket = createSocket();
     socket.on('order:created', (data) => {
-      if (data.tableId === table.id) {
+      if (Number(data.tableId) === Number(table.id)) {
         setExistingOrder(data.order);
         const items = data.items || [];
         setSavedItems(items);
-        setPaymentsList(data.payments || []);
+        // Bu olay tahsilat listesini taşımaz; önceki kısmi ödemeler silinmesin (kalan tutar yanlış görünürdü)
+        if (Array.isArray(data.payments)) setPaymentsList(data.payments);
         const unpaid = items.filter(i => !i.is_paid);
-        setSelectedItemIds([]);
+        // Başka biri sipariş eklediğinde kasiyerin yaptığı seçim korunur
+        setSelectedItemIds(prev => prev.filter(id => unpaid.some(u => u.id === id)));
         setPayingQuantities(prev => {
           const next = { ...prev };
           unpaid.forEach(i => { if (next[i.id] === undefined) next[i.id] = 1; });
@@ -410,8 +430,10 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
       setSavedItems(prev => prev.map(item => item.id === itemId ? { ...item, item_status: status } : item));
     });
 
-    socket.on('order:updated', () => {
-      fetch(`/api/orders/table/${table.id}`)
+    socket.on('order:updated', (payload) => {
+      // Yalnızca bu masayı ilgilendiren güncellemelerde yeniden yükle (her masadaki değişiklikte değil)
+      if (payload?.tableId != null && Number(payload.tableId) !== Number(table.id)) return;
+      apiFetch(`/api/orders/table/${table.id}`)
         .then(r => r.json())
         .then(data => {
           if (data.success) {
@@ -502,9 +524,13 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
     return orderItemsTotal;
   }, [orderItemsTotal]);
 
-  // Masada daha önce tahsil edilmiş toplam ödemeler (payments tablosundan)
+  // Masada daha önce kapatılmış ürün tutarı. Sunucuyla aynı formül: tahsilat − bahşiş + indirim
+  // (bahşiş ürün borcunu kapatmaz, indirim ise kapatır; aksi halde kalan tutar yanlış görünürdü)
   const paidTotal = useMemo(() => {
-    const fromPayments = paymentsList.reduce((sum, p) => sum + parseFloat(p.total_amount || 0), 0);
+    const fromPayments = paymentsList.reduce(
+      (sum, p) => sum + parseFloat(p.total_amount || 0) - parseFloat(p.tip || 0) + parseFloat(p.discount || 0),
+      0
+    );
     const fromPaidItems = paidSavedItems.reduce((sum, item) => sum + parseFloat(item.total_price || 0), 0);
     return Math.max(fromPayments, fromPaidItems);
   }, [paymentsList, paidSavedItems]);
@@ -609,13 +635,9 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
         note: item.note || null
       }));
 
-      const token = localStorage.getItem('kafe_token');
-      const res = await fetch(`/api/orders/table/${table.id}`, {
+      const res = await apiFetch(`/api/orders/table/${table.id}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items: itemsPayload })
       });
 
@@ -658,35 +680,6 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
     });
   };
 
-  // Masadaki kalemi tamamen silme (garson iptali için)
-  const handleDeleteOrderItem = async (item) => {
-    const confirmDelete = window.confirm(`"${item.product_name}" ürününü masadan iptal etmek / silmek istediğinize emin misiniz?`);
-    if (!confirmDelete) return;
-
-    try {
-      const token = localStorage.getItem('kafe_token');
-      const res = await fetch(`/api/orders/items/${item.id}`, {
-        method: 'DELETE',
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
-      });
-      const data = await res.json();
-      if (data.success) {
-        setSavedItems(prev => prev.filter(i => i.id !== item.id));
-        setSelectedItemIds(prev => prev.filter(id => id !== item.id));
-        setPayingQuantities(prev => {
-          const next = { ...prev };
-          delete next[item.id];
-          return next;
-        });
-        showToast('Ürün masadan kaldırıldı.');
-        onTableUpdated?.();
-      }
-    } catch (err) {
-      console.error('Kalem silme hatası:', err);
-      showToast('İşlem gerçekleştirilemedi.', 'danger');
-    }
-  };
-
   // Kalem durumunu güncelleme (delivered, complimentary, returned, cancelled, pending)
   const handleUpdateItemStatus = async (item, targetStatus, quantity = null) => {
     setActionDropdownItemId(null);
@@ -701,13 +694,9 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
     const payloadQty = quantity !== null ? quantity : itemQty;
 
     try {
-      const token = localStorage.getItem('kafe_token');
-      const res = await fetch(`/api/orders/items/${item.id}/status`, {
+      const res = await apiFetch(`/api/orders/items/${item.id}/status`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: targetStatus, quantity: payloadQty })
       });
       const data = await res.json();
@@ -719,7 +708,7 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
           return;
         }
         // Masadaki siparişleri yeniden çek
-        const orderRes = await fetch(`/api/orders/table/${table.id}`);
+        const orderRes = await apiFetch(`/api/orders/table/${table.id}`);
         const orderData = await orderRes.json();
         if (orderData.success) {
           setExistingOrder(orderData.order || null);
@@ -796,16 +785,18 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
       }, 0);
   }, [unpaidSavedItems, selectedItemIds, payingQuantities]);
 
-  // Seçilen ödeme moduna göre baz ödenecek tutar (Ürün seçilmediyse ve özel tutar girilmediyse kalan bakiyenin tamamı baz alınır)
+  // Bu tahsilatta kapatılacak ürün tutarı: seçili ürünler veya elle girilen tutar.
+  // Hiçbir şey seçilmediyse 0'dır; yanlışlıkla tüm hesabın tahsil edilmesi engellenir.
   const basePayableAmount = useMemo(() => {
     if (selectedItemIds.length > 0) {
-      return selectedItemsTotal;
+      // Önceden tutar bazlı ödeme alındıysa seçili ürünler kalan borçtan fazla tutabilir; fazlası tahsil edilmez
+      return Math.min(selectedItemsTotal, remainingTotal);
     }
     // Özel tutar girildiyse onu kullan
     if (customAmountToPay !== '' && !isNaN(parseFloat(customAmountToPay))) {
       return Math.min(remainingTotal, Math.max(0, parseFloat(customAmountToPay)));
     }
-    return remainingTotal > 0 ? remainingTotal : 0;
+    return 0;
   }, [selectedItemIds, selectedItemsTotal, customAmountToPay, remainingTotal]);
 
   // Net Tahsil Edilecek Tutar (Bahşiş ve İndirim Dahil)
@@ -834,68 +825,45 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
     setCustomAmountToPay(next.toFixed(2));
   };
 
-  // Parçalı / Karma Ödemede Nakit Değiştiğinde
-  const handleMixedCashChange = (val) => {
-    setMixedCash(val);
-    const cashVal = parseFloat(val) || 0;
-    const verVal = parseFloat(mixedVeresiye) || 0;
-    const rem = Math.max(0, finalPayableTotal - cashVal - verVal);
-    setMixedCard(rem.toFixed(2));
-  };
-
-  // Parçalı / Karma Ödemede Kart Değiştiğinde
-  const handleMixedCardChange = (val) => {
-    setMixedCard(val);
-    const cardVal = parseFloat(val) || 0;
-    const verVal = parseFloat(mixedVeresiye) || 0;
-    const rem = Math.max(0, finalPayableTotal - cardVal - verVal);
-    setMixedCash(rem.toFixed(2));
-  };
-
-  // Parçalı / Karma Ödemede Veresiye Değiştiğinde
+  // Parçalı ödeme: tutarları personel girer; alanlar birbirini otomatik değiştirmez.
+  // Toplamın tahsil edilecek tutarı tutup tutmadığı kutuda gösterilir ve onaylarken kontrol edilir.
+  const handleMixedCashChange = (val) => setMixedCash(val);
+  const handleMixedCardChange = (val) => setMixedCard(val);
   const handleMixedVeresiyeChange = (val) => {
     setMixedVeresiye(val);
-    const verVal = parseFloat(val) || 0;
-    const rem = Math.max(0, finalPayableTotal - verVal);
-    const currentCard = parseFloat(mixedCard) || 0;
-    if (currentCard === 0) {
-      setMixedCash(rem.toFixed(2));
-      setMixedCard('0.00');
-    } else {
-      if (currentCard <= rem) {
-        setMixedCash((rem - currentCard).toFixed(2));
-      } else {
-        setMixedCard(rem.toFixed(2));
-        setMixedCash('0.00');
-      }
+    if ((parseFloat(val) || 0) > 0 && registeredCustomers.length === 0) fetchRegisteredCustomers();
+  };
+
+  // Parçalı ödemede henüz dağıtılmamış tutarı seçilen türe ekler ("Kalanı ekle")
+  const handleFillMixedRemaining = (field) => {
+    const values = { cash: parseFloat(mixedCash) || 0, card: parseFloat(mixedCard) || 0, veresiye: parseFloat(mixedVeresiye) || 0 };
+    const assigned = values.cash + values.card + values.veresiye;
+    const remaining = Math.max(0, finalPayableTotal - assigned);
+    if (remaining <= 0) return;
+    const next = (values[field] + remaining).toFixed(2);
+    if (field === 'cash') setMixedCash(next);
+    else if (field === 'card') setMixedCard(next);
+    else {
+      setMixedVeresiye(next);
+      fetchRegisteredCustomers();
     }
   };
 
-  // Parçalı Ödemede 50% Nakit - 50% Kart Dağıt
-  const handleSetMixedHalfCashCard = () => {
+  // Parçalı Ödemede yarı yarıya dağıtım (personelin bilerek bastığı hızlı düğmeler)
+  const splitHalf = (first, second) => {
     const half = (finalPayableTotal / 2).toFixed(2);
-    setMixedCash(half);
-    setMixedCard((finalPayableTotal - parseFloat(half)).toFixed(2));
-    setMixedVeresiye('0.00');
+    const rest = (finalPayableTotal - parseFloat(half)).toFixed(2);
+    const values = { cash: '', card: '', veresiye: '' };
+    values[first] = half;
+    values[second] = rest;
+    setMixedCash(values.cash);
+    setMixedCard(values.card);
+    setMixedVeresiye(values.veresiye);
+    if (values.veresiye) fetchRegisteredCustomers();
   };
-
-  // Parçalı Ödemede 50% Nakit - 50% Veresiye Dağıt
-  const handleSetMixedHalfCashVeresiye = () => {
-    const half = (finalPayableTotal / 2).toFixed(2);
-    setMixedCash(half);
-    setMixedVeresiye((finalPayableTotal - parseFloat(half)).toFixed(2));
-    setMixedCard('0.00');
-    fetchRegisteredCustomers();
-  };
-
-  // Parçalı Ödemede 50% Kart - 50% Veresiye Dağıt
-  const handleSetMixedHalfCardVeresiye = () => {
-    const half = (finalPayableTotal / 2).toFixed(2);
-    setMixedCard(half);
-    setMixedVeresiye((finalPayableTotal - parseFloat(half)).toFixed(2));
-    setMixedCash('0.00');
-    fetchRegisteredCustomers();
-  };
+  const handleSetMixedHalfCashCard = () => splitHalf('cash', 'card');
+  const handleSetMixedHalfCashVeresiye = () => splitHalf('cash', 'veresiye');
+  const handleSetMixedHalfCardVeresiye = () => splitHalf('card', 'veresiye');
 
   // Ödeme Şekli Seçildiğinde (Seçili olana tekrar basılırsa seçimi kaldırır)
   const handleSelectPaymentMethod = (method) => {
@@ -906,51 +874,27 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
     setPaymentMethod(method);
     if (method === 'mixed') {
       fetchRegisteredCustomers();
-      if (!mixedCash && !mixedCard && !mixedVeresiye) {
-        const half = (finalPayableTotal / 2).toFixed(2);
-        setMixedCash(half);
-        setMixedCard((finalPayableTotal - parseFloat(half)).toFixed(2));
-        setMixedVeresiye('0.00');
-      }
+      // Parçalı ödeme her açılışta boş başlar; tutarları personel girer
+      setMixedCash('');
+      setMixedCard('');
+      setMixedVeresiye('');
     }
   };
 
-  // Parçalı ödeme seçiliyken bahşiş/indirim veya seçili ürün değiştiğinde tutarları otomatik dengele
-  useEffect(() => {
-    if (paymentMethod === 'mixed' && finalPayableTotal > 0) {
-      const cCash = parseFloat(mixedCash) || 0;
-      const cCard = parseFloat(mixedCard) || 0;
-      const cVer = parseFloat(mixedVeresiye) || 0;
-      const sum = cCash + cCard + cVer;
-      if (Math.abs(sum - finalPayableTotal) > 0.01) {
-        if (cVer > 0 && cVer < finalPayableTotal) {
-          const rem = finalPayableTotal - cVer;
-          if (cCash <= rem) {
-            setMixedCard((rem - cCash).toFixed(2));
-          } else {
-            setMixedCash(rem.toFixed(2));
-            setMixedCard('0.00');
-          }
-        } else {
-          const half = (finalPayableTotal / 2).toFixed(2);
-          setMixedCash(half);
-          setMixedCard(Math.max(0, finalPayableTotal - parseFloat(half)).toFixed(2));
-          setMixedVeresiye('0.00');
-        }
-      }
-    }
-  }, [finalPayableTotal, paymentMethod]);
-
-  // Para Üstü Hesabı (Nakit için)
-  const cashGivenFloat = parseFloat(cashGiven || 0);
-  const changeAmount = cashGivenFloat > finalPayableTotal ? (cashGivenFloat - finalPayableTotal).toFixed(2) : '0.00';
-
   // Masayı Boşaltma / Kapatma (Tüm siparişler ödendiğinde veya manuel kapatmada)
   const handleEmptyTable = async () => {
-    const confirmClose = window.confirm('Masa kapatılıp boşaltılacak. Onaylıyor musunuz?');
+    const unpaidLeft = remainingTotal > 0.05;
+    const confirmClose = await confirm({
+      title: unpaidLeft ? 'Masa ödeme alınmadan kapatılsın mı?' : 'Masa kapatılsın mı?',
+      message: unpaidLeft
+        ? `Masada ₺${remainingTotal.toFixed(2)} ödenmemiş tutar var. Masa tahsilat alınmadan boşaltılacak ve bu işlem kayıt altına alınacak.`
+        : 'Masa kapatılıp boşaltılacak.',
+      confirmLabel: 'Masayı kapat',
+      danger: unpaidLeft
+    });
     if (!confirmClose) return;
     try {
-      const res = await fetch(`/api/tables/${table.id}`, {
+      const res = await apiFetch(`/api/tables/${table.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'empty' })
@@ -976,8 +920,13 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
       showToast('Masadaki tüm ürünlerin ödemesi zaten alınmıştır.', 'info');
       return;
     }
-    if (finalPayableTotal <= 0) {
-      showToast('Lütfen ödenecek ürün seçin veya geçerli bir tahsilat tutarı belirleyin.', 'danger');
+    // Bahşiş tek başına tahsilat sayılmaz: önce ödenecek ürünler seçilmeli veya tutar girilmeli
+    if (basePayableAmount <= 0 || finalPayableTotal <= 0) {
+      showToast('Lütfen ödenecek ürünleri seçin veya tahsil edilecek tutarı girin.', 'warning');
+      return;
+    }
+    if (parseFloat(discountAmount || 0) > basePayableAmount + 0.001) {
+      showToast('İndirim, tahsil edilecek ürün tutarından fazla olamaz.', 'warning');
       return;
     }
 
@@ -991,6 +940,21 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
     if (paymentMethod === 'veresiye' && !veresiyeCustomer.trim() && !veresiyeCustomerId) {
       showToast('Lütfen veresiye yazılacak müşteri veya cari adını giriniz.', 'danger');
       return;
+    }
+
+    if (paymentMethod === 'mixed') {
+      const parts = [parseFloat(mixedCash) || 0, parseFloat(mixedCard) || 0, mixedVeresiyeFloat];
+      if (parts.some(v => v < 0)) {
+        showToast('Parçalı ödemede tutarlar eksi olamaz.', 'warning');
+        return;
+      }
+      const diff = finalPayableTotal - parts.reduce((s, v) => s + v, 0);
+      if (Math.abs(diff) > 0.01) {
+        showToast(diff > 0
+          ? `Parçalı ödemede ₺${diff.toFixed(2)} henüz dağıtılmadı. Kalan tutarı bir ödeme türüne ekleyin.`
+          : `Parçalı ödemede ₺${(-diff).toFixed(2)} fazla girildi. Tutarlar toplamı ₺${finalPayableTotal.toFixed(2)} olmalıdır.`, 'warning');
+        return;
+      }
     }
 
     if (paymentMethod === 'mixed' && mixedVeresiyeFloat > 0 && !veresiyeCustomer.trim() && !veresiyeCustomerId) {
@@ -1010,20 +974,18 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
             id: item.id,
             quantity: payingQuantities[item.id] ?? item.quantity ?? 1
           }));
-      } else if (remainingTotal > 0 && finalPayableTotal >= (remainingTotal - 0.05)) {
+      } else if (remainingTotal > 0 && basePayableAmount >= (remainingTotal - 0.05)) {
+        // Elle girilen tutar kalan hesabın tamamını kapatıyorsa tüm kalemler ödendi sayılır
+        // (bahşiş bu karşılaştırmaya katılmaz; yalnızca ürün tutarı)
         paidItemsPayload = unpaidSavedItems.map(item => ({
           id: item.id,
           quantity: item.quantity
         }));
       }
 
-      const token = localStorage.getItem('kafe_token');
-      const res = await fetch(`/api/orders/table/${table.id}/pay`, {
+      const res = await apiFetch(`/api/orders/table/${table.id}/pay`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           payment_method: paymentMethod,
           amount_paid: finalPayableTotal,
@@ -1045,7 +1007,7 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
         if (data.isPartial) {
           showToast(data.message || `₺${finalPayableTotal.toFixed(2)} tutarında kısmi ödeme alındı.`, 'success');
           // Güncel sipariş ve tahsilatları yeniden çek
-          const orderRes = await fetch(`/api/orders/table/${table.id}`);
+          const orderRes = await apiFetch(`/api/orders/table/${table.id}`);
           const orderData = await orderRes.json();
           if (orderData.success) {
             setExistingOrder(orderData.order || null);
@@ -1059,7 +1021,6 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
             setPayingQuantities(initQtys);
             // Formu sıfırla
             setCustomAmountToPay('');
-            setCashGiven('');
             setPaymentMethod(null);
             setDiscountAmount(0);
             setTipAmount(0);
@@ -1087,917 +1048,83 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
     }
   };
 
-  // Veresiye Müşteri Seçim Dropdown Bileşeni
-  const renderCustomerDropdown = () => (
-    <div className="pos-veresiye-dropdown-wrap" ref={customerDropdownRef}>
-      <div
-        className={`pos-veresiye-custom-select-trigger ${isCustomerDropdownOpen ? 'is-open' : ''}`}
-        onClick={() => setIsCustomerDropdownOpen(prev => !prev)}
-      >
-        <div className="pos-veresiye-trigger-left">
-          <div className="pos-veresiye-trigger-avatar">
-            {selectedRegisteredCustomer ? selectedRegisteredCustomer.name.charAt(0).toUpperCase() : <User size={15} />}
-          </div>
-          {selectedRegisteredCustomer ? (
-            <div className="pos-veresiye-trigger-details">
-              <span className="pos-veresiye-trigger-name">{selectedRegisteredCustomer.name}</span>
-              {selectedRegisteredCustomer.phone && selectedRegisteredCustomer.phone.length > 1 && (
-                <span className="pos-veresiye-trigger-phone">({selectedRegisteredCustomer.phone})</span>
-              )}
-            </div>
-          ) : (
-            <span className="pos-veresiye-trigger-placeholder">-- Müşteri Seçiniz (Kayıtlı Cariler) --</span>
-          )}
-        </div>
-
-        <div className="pos-veresiye-trigger-right">
-          {selectedRegisteredCustomer && (
-            <span className={`pos-veresiye-item-debt-badge ${parseFloat(selectedRegisteredCustomer.current_balance || 0) > 0 ? 'debt' : 'clear'}`}>
-              {parseFloat(selectedRegisteredCustomer.current_balance || 0) > 0
-                ? `Borç: ₺${parseFloat(selectedRegisteredCustomer.current_balance).toFixed(2)}`
-                : 'Borçsuz'}
-            </span>
-          )}
-          {selectedRegisteredCustomer && (
-            <button
-              type="button"
-              className="pos-veresiye-trigger-clear-btn"
-              title="Seçimi Kaldır"
-              onClick={(e) => {
-                e.stopPropagation();
-                setVeresiyeCustomerId(null);
-                setVeresiyeCustomer('');
-              }}
-            >
-              <X size={14} />
-            </button>
-          )}
-          <ChevronDown size={16} className={`pos-veresiye-trigger-chevron ${isCustomerDropdownOpen ? 'rotated' : ''}`} />
-        </div>
-      </div>
-
-      {/* Açılan Menü */}
-      {isCustomerDropdownOpen && (
-        <div className="pos-veresiye-custom-menu" onClick={(e) => e.stopPropagation()}>
-          <div className="pos-veresiye-menu-search-box">
-            <Search size={14} color="#486b78" />
-            <input
-              type="text"
-              placeholder="Müşteri adı veya telefon ile filtrele..."
-              value={customerSearchTerm}
-              onChange={(e) => setCustomerSearchTerm(e.target.value)}
-              autoFocus
-              className="pos-veresiye-menu-search-input"
-            />
-            {customerSearchTerm && (
-              <button
-                type="button"
-                className="pos-veresiye-trigger-clear-btn"
-                onClick={() => setCustomerSearchTerm('')}
-              >
-                <X size={13} />
-              </button>
-            )}
-          </div>
-
-          <div className="pos-veresiye-menu-list">
-            {filteredCustomers.length > 0 ? (
-              filteredCustomers.map(c => {
-                const debt = parseFloat(c.current_balance || 0);
-                const isSelected = veresiyeCustomerId === c.id;
-                return (
-                  <div
-                    key={c.id}
-                    className={`pos-veresiye-menu-item ${isSelected ? 'is-selected' : ''}`}
-                    onClick={() => {
-                      setVeresiyeCustomerId(c.id);
-                      setVeresiyeCustomer(c.name);
-                      setIsCustomerDropdownOpen(false);
-                      setCustomerSearchTerm('');
-                    }}
-                  >
-                    <div className="pos-veresiye-item-left">
-                      <div className="pos-veresiye-item-avatar">
-                        {c.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="pos-veresiye-item-details">
-                        <div className="pos-veresiye-item-title-row">
-                          <span className="pos-veresiye-item-name">{c.name}</span>
-                          {isSelected && <Check size={13} color="#2d6a4f" />}
-                        </div>
-                        {c.phone && c.phone.length > 1 && (
-                          <span className="pos-veresiye-item-phone">
-                            <Phone size={11} /> {c.phone}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="pos-veresiye-item-right">
-                      <span className={`pos-veresiye-item-debt-badge ${debt > 0 ? 'debt' : 'clear'}`}>
-                        {debt > 0 ? `Borç: ₺${debt.toFixed(2)}` : 'Borçsuz'}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="pos-veresiye-menu-empty">
-                <AlertCircle size={18} color="#b88214" />
-                <span>"{customerSearchTerm}" bulunamadı</span>
-                <button
-                  type="button"
-                  className="pos-veresiye-create-prompt-btn"
-                  onClick={() => {
-                    setQuickCustName(toTitleCaseTr(customerSearchTerm));
-                    setQuickCustPhone('0');
-                    setQuickCustNotes('');
-                    setQuickCustError('');
-                    setShowQuickAddCustomerModal(true);
-                    setIsCustomerDropdownOpen(false);
-                  }}
-                >
-                  <UserPlus size={14} />
-                  <span>"{toTitleCaseTr(customerSearchTerm)}" Olarak Yeni Ekle</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
   return (
     <div className="pos-overlay" onClick={handleModalClose}>
       <div className={`pos-window tab-${activeTab}`} onClick={(e) => e.stopPropagation()}>
 
-        {/* ======================================================== */}
-        {/* SOL PANEL (MASA BADGE & NAVİGASYON & DİKEY KATEGORİLER)  */}
-        {/* ======================================================== */}
-        <aside className="pos-left-panel">
-
-          {/* Masa Bilgi Rozeti */}
-          <div className="pos-table-card pos-order-table-card">
-            <div className="pos-table-card-avatar">
-              <Coffee size={20} color="#346c80" />
-            </div>
-            <div className="pos-table-card-info">
-              <div className="pos-table-card-top-row">
-                <h2 className="pos-table-card-title">{table.title}</h2>
-                <button
-                  type="button"
-                  className="pos-table-card-transfer-btn"
-                  title="Masa Taşıma"
-                  onClick={() => showToast('Masa taşıma özelliği yakında aktif edilecektir.', 'info')}
-                >
-                  <ArrowLeftRight size={13} />
-                </button>
-              </div>
-              <div className="pos-table-card-sub-row">
-                <span
-                  className="pos-table-card-code"
-                  title={existingOrder?.order_number ? `Sipariş GUID: ${existingOrder.order_number} (Kopyalamak için tıkla)` : 'Masada henüz açık sipariş yok'}
-                  onClick={() => {
-                    if (existingOrder?.order_number) {
-                      navigator.clipboard?.writeText(existingOrder.order_number);
-                      showToast('Sipariş GUID kopyalandı', 'info');
-                    }
-                  }}
-                  style={{ cursor: existingOrder?.order_number ? 'pointer' : 'default' }}
-                >
-                  {orderGuid}
-                </span>
-                <span className={`pos-table-card-status ${existingOrder?.id ? 'active-order' : 'empty-order'}`}>
-                  <span className={`pos-status-dot ${existingOrder?.id ? 'occupied' : 'empty'}`}></span>
-                  {existingOrder?.id ? 'Açık' : 'Boş'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Sekme Butonları */}
-          <div className="pos-nav-tabs">
-            <button
-              type="button"
-              className={`pos-nav-tab-btn ${activeTab === 'payment' ? 'active' : ''}`}
-              onClick={() => setActiveTab('payment')}
-            >
-              <Receipt size={17} />
-              <span>Hesap Ödeme</span>
-              {savedItems.length > 0 && (
-                <span className="pos-tab-counter-badge">{savedItems.length}</span>
-              )}
-            </button>
-
-            <button
-              type="button"
-              className={`pos-nav-tab-btn ${activeTab === 'order' ? 'active' : ''}`}
-              onClick={() => setActiveTab('order')}
-            >
-              <Utensils size={17} />
-              <span>Menü & Sipariş</span>
-              {cartItemCount > 0 && (
-                <span className="pos-tab-counter-badge new">{cartItemCount}</span>
-              )}
-            </button>
-          </div>
-
-          {/* Menü & Sipariş Sekmesinde: Kategori Listesi (Mobilde Kompakt Dropdown Seçici, Masaüstünde Dikey Liste) */}
-          {activeTab === 'order' && (
-            <div className="pos-cat-section">
-              {/* Masaüstü Başlığı */}
-              <div className="pos-cat-section-header">
-                <h4 className="pos-cat-section-title">Kategoriler</h4>
-                <span className="pos-cat-total-count">({products.length})</span>
-              </div>
-
-              {/* Mobilde Özel Kategori Dropdown Seçicisi */}
-              <div className="pos-mobile-cat-dropdown-wrap">
-                <select
-                  className="pos-mobile-cat-select"
-                  value={selectedCategoryId}
-                  onChange={(e) => setSelectedCategoryId(e.target.value)}
-                >
-                  <option value="all">Tüm Kategoriler ({products.length} Ürün)</option>
-                  {categories.map(cat => {
-                    const count = products.filter(p => p.category_id === cat.id).length;
-                    return (
-                      <option key={cat.id} value={cat.id.toString()}>
-                        {cat.name} ({count} Ürün)
-                      </option>
-                    );
-                  })}
-                </select>
-                <ChevronDown size={16} className="pos-mobile-cat-select-icon" />
-              </div>
-
-              {/* Masaüstü Dikey Kategori Listesi */}
-              <div className="pos-cat-list-vertical">
-                {/* Tüm Ürünler */}
-                <button
-                  type="button"
-                  className={`pos-cat-list-item ${selectedCategoryId === 'all' ? 'active' : ''}`}
-                  onClick={() => setSelectedCategoryId('all')}
-                >
-                  <span className="pos-cat-item-name">Tüm Ürünler</span>
-                  <span className="pos-cat-item-count">{products.length}</span>
-                </button>
-
-                {/* Kategoriler */}
-                {categories.map(cat => {
-                  const count = products.filter(p => p.category_id === cat.id).length;
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      className={`pos-cat-list-item ${selectedCategoryId === cat.id.toString() ? 'active' : ''}`}
-                      onClick={() => setSelectedCategoryId(cat.id.toString())}
-                    >
-                      <span className="pos-cat-item-name">{cat.name}</span>
-                      <span className="pos-cat-item-count">{count}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-        </aside>
+        <OrderSidebar
+          perms={perms}
+          onOpenTransfer={() => setShowTransferModal(true)}
+          table={table}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          cartItemCount={cartItemCount}
+          categories={categories}
+          existingOrder={existingOrder}
+          orderGuid={orderGuid}
+          products={products}
+          savedItems={savedItems}
+          selectedCategoryId={selectedCategoryId}
+          setSelectedCategoryId={setSelectedCategoryId}
+          showToast={showToast}
+        />
 
         {/* ======================================================== */}
         {/* ORTA PANEL (YÜKSEK YOĞUNLUKLU ÜRÜNLER / ADİSYON TABLOSU)  */}
         {/* ======================================================== */}
         <main className="pos-center-panel">
 
-          {/* -------------------------------------------------------- */}
-          {/* DURUM 1: MENÜ & SİPARİŞ SEKMESİ                          */}
-          {/* -------------------------------------------------------- */}
-          {activeTab === 'order' && (
-            <div className="pos-order-center-view">
-
-              {/* Üst Arama Çubuğu */}
-              <div className="pos-search-bar">
-                <Search size={18} className="pos-search-icon" />
-                <input
-                  type="text"
-                  placeholder="Menüde ürün veya lezzet ara..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    className="pos-search-clear-btn"
-                    onClick={() => setSearchQuery('')}
-                  >
-                    <X size={15} />
-                  </button>
-                )}
-              </div>
-
-              {/* Kompakt ve Çoklu Ürün Izgarası (5-6 Kolon) */}
-              <div className="pos-product-grid-wrap">
-                {loading ? (
-                  <div className="pos-grid-empty">
-                    <div className="cat-btn-spinner" style={{ width: '28px', height: '28px', borderColor: '#6293a3', borderTopColor: '#346c80' }}></div>
-                    <p>Menü yükleniyor...</p>
-                  </div>
-                ) : filteredProducts.length === 0 ? (
-                  <div className="pos-grid-empty">
-                    <Utensils size={36} color="#c8b6a6" />
-                    <p>Bu kategoride ürün bulunamadı.</p>
-                  </div>
-                ) : (
-                  <div className="pos-product-grid">
-                    {filteredProducts.map(prod => {
-                      const countInCart = getProductCartCount(prod.id);
-                      return (
-                        <div
-                          key={prod.id}
-                          className={`pos-product-card ${countInCart > 0 ? 'in-cart' : ''}`}
-                          onClick={() => handleAddToCart(prod)}
-                        >
-                          {/* Sepetteki Adet Rozeti (Sol Üst) */}
-                          {countInCart > 0 && (
-                            <div className="pos-product-cart-count-badge">
-                              {countInCart}x
-                            </div>
-                          )}
-
-                          {/* Fiyat Rozeti (Sağ Üst) */}
-                          <div className="pos-product-price-badge">
-                            ₺{parseFloat(prod.price || 0).toFixed(0)}
-                          </div>
-
-                          {/* Ürün Görseli */}
-                          <div className="pos-product-img-box">
-                            {prod.image_url ? (
-                              <img
-                                src={prod.image_url}
-                                alt={prod.name}
-                                loading="lazy"
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none';
-                                  if (e.currentTarget.nextSibling) {
-                                    e.currentTarget.nextSibling.style.display = 'flex';
-                                  }
-                                }}
-                              />
-                            ) : null}
-                            <div
-                              className="pos-product-fallback-img"
-                              style={{ display: prod.image_url ? 'none' : 'flex' }}
-                            >
-                              <Coffee size={24} color="#346c80" />
-                            </div>
-                          </div>
-
-                          {/* Ürün Başlığı & Hızlı Ekle Butonu */}
-                          <div className="pos-product-bottom-row">
-                            <span className="pos-product-name" title={prod.name}>
-                              {prod.name}
-                            </span>
-                            <button
-                              type="button"
-                              className="pos-product-add-btn"
-                              title="Sepete Ekle"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAddToCart(prod);
-                              }}
-                            >
-                              <Plus size={14} />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Mobil Ekranlar İçin Sabit Kayan / Alt Önizleme Sepet Çubuğu */}
-              {cartItems.length > 0 && (
-                <div
-                  className="pos-mobile-cart-floating-bar"
-                  onClick={() => {
-                    setIsMobileCartDrawerOpen(true);
-                    setDragOffsetY(0);
-                  }}
-                  onTouchStart={handleBarTouchStart}
-                  onTouchMove={handleBarTouchMove}
-                  onTouchEnd={handleBarTouchEnd}
-                >
-                  <div className="pos-mobile-cart-bar-left">
-                    <div className="pos-mobile-cart-badge-icon">
-                      <ShoppingBag size={15} />
-                      <span className="pos-mobile-cart-badge">{cartItemCount}</span>
-                    </div>
-                    <div className="pos-mobile-cart-col">
-                      <span className="pos-mobile-cart-label">Sepet Önizleme</span>
-                      <strong className="pos-mobile-cart-total">₺{cartTotal.toFixed(2)}</strong>
-                    </div>
-                  </div>
-                  <div className="pos-mobile-cart-bar-right">
-                    <span>Sepeti Gör & Onayla</span>
-                    <ChevronUp size={16} />
-                  </div>
-                </div>
-              )}
-
+          {tableQrRequests.length > 0 && (
+            <div className="qr-table-pending">
+              <strong><QrCode size={15} /> Bu masadan onay bekleyen QR sipariş</strong>
+              <QrRequestList
+                requests={tableQrRequests}
+                canAct={perms.order}
+                showTable={false}
+                onChanged={() => { reloadTableQr(); onTableUpdated?.(); }}
+              />
             </div>
           )}
 
-          {/* -------------------------------------------------------- */}
-          {/* DURUM 2: HESAP ÖDEME SEKMESİ (ADİSYON KALEMLERİ)         */}
-          {/* -------------------------------------------------------- */}
-          {activeTab === 'payment' && (
-            <div className="pos-payment-center-view">
+          <MenuTab
+            perms={perms}
+            activeTab={activeTab}
+            cartItemCount={cartItemCount}
+            cartItems={cartItems}
+            cartTotal={cartTotal}
+            filteredProducts={filteredProducts}
+            getProductCartCount={getProductCartCount}
+            handleAddToCart={handleAddToCart}
+            handleBarTouchEnd={handleBarTouchEnd}
+            handleBarTouchMove={handleBarTouchMove}
+            handleBarTouchStart={handleBarTouchStart}
+            loading={loading}
+            searchQuery={searchQuery}
+            setDragOffsetY={setDragOffsetY}
+            setIsMobileCartDrawerOpen={setIsMobileCartDrawerOpen}
+            setSearchQuery={setSearchQuery}
+          />
 
-              {/* Daha Önce Alınmış Kısmi Tahsilatlar Geçmişi */}
-              {paymentsList.length > 0 && (
-                <div className="pos-payment-history-banner">
-                  <div className="pos-payment-history-title">
-                    <Receipt size={14} />
-                    <span>Önceki Tahsilatlar ({paymentsList.length}):</span>
-                  </div>
-                  <div className="pos-payment-history-pills-wrap">
-                    {paymentsList.map((pm, idx) => {
-                      const isVeresiye = pm.payment_method === 'veresiye' || (pm.payment_method === 'mixed' && parseFloat(pm.veresiye_amount || 0) > 0);
-                      let methodLabel = '';
-                      if (pm.payment_method === 'cash') {
-                        methodLabel = 'Nakit';
-                      } else if (pm.payment_method === 'credit_card') {
-                        methodLabel = 'Kart';
-                      } else if (pm.payment_method === 'veresiye') {
-                        methodLabel = `Veresiye (${pm.customer_name || 'Cari'})`;
-                      } else if (pm.payment_method === 'mixed') {
-                        const parts = [];
-                        if (parseFloat(pm.cash_amount || 0) > 0) parts.push(`${parseFloat(pm.cash_amount).toFixed(0)}₺ N`);
-                        if (parseFloat(pm.card_amount || 0) > 0) parts.push(`${parseFloat(pm.card_amount).toFixed(0)}₺ K`);
-                        if (parseFloat(pm.veresiye_amount || 0) > 0) parts.push(`${parseFloat(pm.veresiye_amount).toFixed(0)}₺ V`);
-                        methodLabel = `Karma (${parts.join(' + ')}${pm.customer_name ? ` - ${pm.customer_name}` : ''})`;
-                      }
-                      const timeStr = pm.created_at ? new Date(pm.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '';
-                      return (
-                        <div key={pm.id || idx} className={`pos-payment-history-pill ${isVeresiye ? 'veresiye' : ''}`} title={pm.notes || ''}>
-                          <strong>₺{parseFloat(pm.total_amount || 0).toFixed(2)}</strong>
-                          <span className="pill-method">({methodLabel})</span>
-                          {timeStr && <span className="pill-time">{timeStr}</span>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              <div className="pos-saved-items-table-container">
-
-                {/* Tablo Başlık Satırı */}
-                <div className="pos-table-header-row">
-                  <div className="pos-col-check">
-                    <input
-                      type="checkbox"
-                      checked={unpaidSavedItems.length > 0 && selectedItemIds.length === unpaidSavedItems.length}
-                      disabled={unpaidSavedItems.length === 0}
-                      onChange={(e) => handleSelectAllItems(e.target.checked)}
-                      title="Ödeneceklerin Tümünü Seç / Kaldır"
-                    />
-                  </div>
-                  <div
-                    className="pos-col-product"
-                    onClick={() => {
-                      if (unpaidSavedItems.length > 0) {
-                        handleSelectAllItems();
-                      }
-                    }}
-                    style={{ cursor: unpaidSavedItems.length > 0 ? 'pointer' : 'default', userSelect: 'none' }}
-                    title="Ödeneceklerin Tümünü Seç / Kaldır"
-                  >
-                    Tümünü Seç
-                  </div>
-                  <div className="pos-col-qty">Miktar & İşlem</div>
-                  <div className="pos-col-price">Tutar</div>
-                </div>
-
-                {/* Tablo Kalemleri */}
-                <div className="pos-table-body-rows">
-                  {displayedSavedItems.length === 0 ? (
-                    <div className="pos-saved-items-empty">
-                      <Receipt size={42} color="#cbb8a6" />
-                      <h4>Açık Sipariş Bulunmuyor</h4>
-                      <p>"Menü & Sipariş" sekmesinden ürün seçip masaya anında sipariş ekleyebilirsiniz.</p>
-                      <button
-                        type="button"
-                        className="pos-btn-switch-menu"
-                        onClick={() => setActiveTab('order')}
-                      >
-                        <Utensils size={15} />
-                        <span>Menüye Git & Sipariş Ekle</span>
-                      </button>
-                    </div>
-                  ) : (
-                    displayedSavedItems.map((item, index) => {
-                      const isPaid = !!item.is_paid;
-                      const isSpecial = ['cancelled', 'returned', 'complimentary'].includes(item.item_status);
-                      const isSelectable = !isPaid && !isSpecial;
-                      const isSelected = isSelectable && selectedItemIds.includes(item.id);
-                      const currentPayQty = payingQuantities[item.id] ?? 1;
-                      const isDropdownOpen = actionDropdownItemId === item.id;
-                      const isNearBottom = index >= displayedSavedItems.length - 2 && displayedSavedItems.length >= 3;
-
-                      return (
-                        <div
-                          key={item.id}
-                          className={`pos-table-item-row ${isDropdownOpen ? 'pos-row-has-open-dropdown' : ''} ${isPaid ? 'row-paid' : isSpecial ? `row-special status-${item.item_status}` : isSelected ? 'row-selected' : ''}`}
-                          onClick={() => {
-                            if (isSelectable) {
-                              handleToggleItemSelection(item.id);
-                            }
-                          }}
-                        >
-                          {/* Checkbox / Paid Badge / Special Icon */}
-                          <div className="pos-col-check">
-                            {isPaid ? (
-                              <span className="pos-item-paid-check" title="Bu ürünün ödemesi tamamlandı">
-                                <Check size={13} color="#2d6a4f" />
-                              </span>
-                            ) : item.item_status === 'complimentary' ? (
-                              <span className="pos-item-special-icon ikram" title="İkram (Ücretsiz)">
-                                <Gift size={15} color="#7e22ce" />
-                              </span>
-                            ) : item.item_status === 'returned' ? (
-                              <span className="pos-item-special-icon iade" title="İade Edildi">
-                                <RotateCcw size={14} color="#c2410c" />
-                              </span>
-                            ) : item.item_status === 'cancelled' ? (
-                              <span className="pos-item-special-icon iptal" title="İptal Edildi">
-                                <Ban size={14} color="#dc2626" />
-                              </span>
-                            ) : (
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => handleToggleItemSelection(item.id)}
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            )}
-                          </div>
-
-                          {/* Ürün Görseli, Adı ve Durum Rozeti */}
-                          <div className="pos-col-product">
-                            <div className="pos-row-item-thumb">
-                              {item.image_url ? (
-                                <img src={item.image_url} alt={item.product_name} />
-                              ) : (
-                                <Coffee size={18} color="#346c80" />
-                              )}
-                            </div>
-                            <div className="pos-row-item-details">
-                              <span className={`pos-row-item-title ${item.item_status === 'cancelled' ? 'title-cancelled' : ''}`}>
-                                {item.product_name}
-                              </span>
-                              <div className="pos-row-item-badges">
-                                {isPaid ? (
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <span className="pos-item-status-pill paid">
-                                      <Check size={10} style={{ marginRight: '3px' }} />
-                                      ÖDENDİ
-                                    </span>
-                                    <div className="pos-item-mobile-qty-wrap">
-                                      <span className="pos-mobile-qty-pill paid">
-                                        {item.quantity} Adet
-                                      </span>
-                                    </div>
-                                  </div>
-                                ) : isSpecial ? (
-                                  <div className="pos-item-actions-wrapper" onClick={(e) => e.stopPropagation()}>
-                                    <span className={`pos-item-status-pill ${item.item_status}`}>
-                                      {item.item_status === 'complimentary' && <Gift size={10} style={{ marginRight: '3px' }} />}
-                                      {item.item_status === 'returned' && <RotateCcw size={10} style={{ marginRight: '3px' }} />}
-                                      {item.item_status === 'cancelled' && <Ban size={10} style={{ marginRight: '3px' }} />}
-                                      {item.item_status === 'complimentary' ? 'İKRAM' : item.item_status === 'returned' ? 'İADE' : 'İPTAL'}
-                                    </span>
-                                    {/* Geri Al / Durum Değiştir Butonu */}
-                                    <button
-                                      type="button"
-                                      className="pos-btn-action-menu"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setActionDropdownItemId(prev => prev === item.id ? null : item.id);
-                                      }}
-                                      title="Durumu Değiştir / Geri Al"
-                                    >
-                                      <MoreHorizontal size={13} />
-                                    </button>
-                                    {/* Mobilde Adet Bilgisi */}
-                                    <div className="pos-item-mobile-qty-wrap">
-                                      <span className={`pos-mobile-qty-pill ${item.item_status}`}>
-                                        {item.quantity} Adet
-                                      </span>
-                                    </div>
-                                    {actionDropdownItemId === item.id && (
-                                      <div className={`pos-item-action-dropdown ${isNearBottom ? 'dropdown-up' : ''}`} onClick={(e) => e.stopPropagation()}>
-                                        <button
-                                          type="button"
-                                          className="pos-item-action-btn deliver"
-                                          onClick={() => handleUpdateItemStatus(item, 'delivered')}
-                                        >
-                                          <Check size={12} />
-                                          <span>Teslim Edildi Yap</span>
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className="pos-item-action-btn pending"
-                                          onClick={() => handleUpdateItemStatus(item, 'pending')}
-                                        >
-                                          <Utensils size={12} />
-                                          <span>Mutfağa Geri Al</span>
-                                        </button>
-                                        {item.item_status !== 'complimentary' && (
-                                          <button
-                                            type="button"
-                                            className="pos-item-action-btn complimentary"
-                                            onClick={() => handleUpdateItemStatus(item, 'complimentary')}
-                                          >
-                                            <Gift size={12} />
-                                            <span>İkram Yap</span>
-                                          </button>
-                                        )}
-                                        {item.item_status !== 'returned' && (
-                                          <button
-                                            type="button"
-                                            className="pos-item-action-btn return"
-                                            onClick={() => handleUpdateItemStatus(item, 'returned')}
-                                          >
-                                            <RotateCcw size={12} />
-                                            <span>İade Al</span>
-                                          </button>
-                                        )}
-                                        {item.item_status !== 'cancelled' && (
-                                          <button
-                                            type="button"
-                                            className="pos-item-action-btn cancel"
-                                            onClick={() => handleUpdateItemStatus(item, 'cancelled')}
-                                          >
-                                            <Ban size={12} />
-                                            <span>Siparişi İptal Et</span>
-                                          </button>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <div className="pos-item-actions-wrapper" onClick={(e) => e.stopPropagation()}>
-                                    <span className={`pos-item-status-pill ${item.item_status || 'pending'}`}>
-                                      {item.item_status === 'delivered'
-                                        ? 'TESLİM EDİLDİ'
-                                        : item.item_status === 'ready'
-                                          ? 'HAZIR'
-                                          : 'MUTFAKTA'}
-                                    </span>
-                                    {item.item_status !== 'delivered' && (
-                                      <button
-                                        type="button"
-                                        className="pos-btn-deliver-compact"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDeliverItem(item.id);
-                                        }}
-                                        title="Ürünü Teslim Edildi Olarak İşaretle"
-                                      >
-                                        <Check size={11} />
-                                        <span>Teslim Et</span>
-                                      </button>
-                                    )}
-
-                                    {/* İşlem Menüsü (İkram, İade, İptal) */}
-                                    <button
-                                      type="button"
-                                      className="pos-btn-action-menu"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setActionDropdownItemId(prev => prev === item.id ? null : item.id);
-                                      }}
-                                      title="İkram, İade veya İptal İşlemleri"
-                                    >
-                                      <MoreHorizontal size={13} />
-                                    </button>
-
-                                    {/* Mobilde Teslim Et Butonu Yerine Adet Stepper'ı */}
-                                    <div className="pos-item-mobile-qty-wrap">
-                                      <div className="pos-qty-stepper compact">
-                                        <button
-                                          type="button"
-                                          className="pos-stepper-btn"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleUpdatePayQty(item.id, -1, item.quantity);
-                                          }}
-                                          disabled={currentPayQty <= 1 || !isSelected}
-                                          title="Ödenecek Adedi Azalt"
-                                        >
-                                          <Minus size={11} />
-                                        </button>
-                                        <span
-                                          className="pos-stepper-val"
-                                          title={`Masada ${item.quantity} adet mevcut, ${currentPayQty} adedi tahsilata dahil`}
-                                        >
-                                          {currentPayQty}/{item.quantity}
-                                        </span>
-                                        <button
-                                          type="button"
-                                          className="pos-stepper-btn"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleUpdatePayQty(item.id, +1, item.quantity);
-                                          }}
-                                          disabled={currentPayQty >= item.quantity || !isSelected}
-                                          title="Ödenecek Adedi Artır"
-                                        >
-                                          <Plus size={11} />
-                                        </button>
-                                      </div>
-                                    </div>
-
-                                    {actionDropdownItemId === item.id && (
-                                      <div className={`pos-item-action-dropdown ${isNearBottom ? 'dropdown-up' : ''}`} onClick={(e) => e.stopPropagation()}>
-                                        {item.item_status !== 'delivered' && (
-                                          <button
-                                            type="button"
-                                            className="pos-item-action-btn deliver"
-                                            onClick={() => handleUpdateItemStatus(item, 'delivered')}
-                                          >
-                                            <Check size={12} />
-                                            <span>Teslim Edildi</span>
-                                          </button>
-                                        )}
-                                        <button
-                                          type="button"
-                                          className="pos-item-action-btn complimentary"
-                                          onClick={() => handleUpdateItemStatus(item, 'complimentary')}
-                                        >
-                                          <Gift size={12} />
-                                          <span>İkram Yap</span>
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className="pos-item-action-btn return"
-                                          onClick={() => handleUpdateItemStatus(item, 'returned')}
-                                        >
-                                          <RotateCcw size={12} />
-                                          <span>İade Al</span>
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className="pos-item-action-btn cancel"
-                                          onClick={() => handleUpdateItemStatus(item, 'cancelled')}
-                                        >
-                                          <Ban size={12} />
-                                          <span>Siparişi İptal Et</span>
-                                        </button>
-                                        {item.item_status !== 'pending' && (
-                                          <button
-                                            type="button"
-                                            className="pos-item-action-btn pending"
-                                            onClick={() => handleUpdateItemStatus(item, 'pending')}
-                                          >
-                                            <Utensils size={12} />
-                                            <span>Mutfakta Durumu</span>
-                                          </button>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                                {item.note && (
-                                  <span className="pos-row-item-note">"{item.note}"</span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Miktar & Kontroller */}
-                          <div className="pos-col-qty" onClick={(e) => e.stopPropagation()}>
-                            {isPaid || isSpecial ? (
-                              <div className="pos-qty-paid-badge-wrap">
-                                <span className={`pos-stepper-val ${isPaid ? 'paid' : item.item_status}`}>
-                                  {item.quantity} Adet
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="pos-qty-stepper">
-                                <button
-                                  type="button"
-                                  className="pos-stepper-btn"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleUpdatePayQty(item.id, -1, item.quantity);
-                                  }}
-                                  disabled={currentPayQty <= 1 || !isSelected}
-                                  title="Ödenecek Adedi Azalt"
-                                >
-                                  <Minus size={12} />
-                                </button>
-                                <span
-                                  className="pos-stepper-val"
-                                  title={`Masada ${item.quantity} adet mevcut, ${currentPayQty} adedi tahsilata dahil`}
-                                >
-                                  {currentPayQty}/{item.quantity}
-                                </span>
-                                <button
-                                  type="button"
-                                  className="pos-stepper-btn"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleUpdatePayQty(item.id, +1, item.quantity);
-                                  }}
-                                  disabled={currentPayQty >= item.quantity || !isSelected}
-                                  title="Ödenecek Adedi Artır"
-                                >
-                                  <Plus size={12} />
-                                </button>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Tutar */}
-                          <div className="pos-col-price">
-                            {isPaid ? (
-                              <span style={{ fontWeight: 700, color: '#2d6a4f', fontSize: '0.95rem' }}>
-                                ₺{parseFloat(item.total_price || 0).toFixed(2)}
-                              </span>
-                            ) : item.item_status === 'complimentary' ? (
-                              <>
-                                <span style={{ fontWeight: 700, color: '#6b21a8', fontSize: '0.95rem' }}>
-                                  ₺0.00
-                                </span>
-                                <span style={{ display: 'block', fontSize: '0.72rem', color: '#9333ea', fontWeight: 600 }}>
-                                  (İKRAM)
-                                </span>
-                              </>
-                            ) : item.item_status === 'returned' ? (
-                              <>
-                                <span style={{ fontWeight: 600, color: '#c2410c', fontSize: '0.92rem', textDecoration: 'line-through' }}>
-                                  ₺{parseFloat(item.total_price || 0).toFixed(2)}
-                                </span>
-                                <span style={{ display: 'block', fontSize: '0.72rem', color: '#ea580c', fontWeight: 600 }}>
-                                  (İADE)
-                                </span>
-                              </>
-                            ) : item.item_status === 'cancelled' ? (
-                              <>
-                                <span style={{ fontWeight: 600, color: '#b91c1c', fontSize: '0.92rem', textDecoration: 'line-through' }}>
-                                  ₺{parseFloat(item.total_price || 0).toFixed(2)}
-                                </span>
-                                <span style={{ display: 'block', fontSize: '0.72rem', color: '#dc2626', fontWeight: 600 }}>
-                                  (İPTAL)
-                                </span>
-                              </>
-                            ) : (
-                              <>
-                                <span style={{ fontWeight: isSelected ? 700 : 600, color: isSelected ? '#346c80' : '#4a332d', fontSize: '0.95rem' }}>
-                                  ₺{parseFloat(item.total_price || 0).toFixed(2)}
-                                </span>
-                                <span className="pos-unit-price-sub" style={{ display: 'block', fontSize: '0.72rem', color: '#486b78', fontWeight: 500 }}>
-                                  (Adet: ₺{parseFloat(item.unit_price || 0).toFixed(2)})
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-
-                {/* Tablo Alt Çubuğu */}
-                <div className="pos-payment-center-footer">
-                  <div className="pos-footer-metrics-bar">
-                    {/* 1. Ödenmiş */}
-                    <div className={`pos-metric-card paid ${paidTotal > 0 ? 'has-paid' : ''}`}>
-                      <span className="pos-metric-label">Ödenmiş</span>
-                      <strong className="pos-metric-val">₺{paidTotal.toFixed(2)}</strong>
-                    </div>
-
-                    {/* 2. Kalan Tutar */}
-                    <div className={`pos-metric-card remaining ${remainingTotal > 0 ? 'has-rem' : 'all-cleared'}`}>
-                      <span className="pos-metric-label">Kalan Tutar</span>
-                      <strong className="pos-metric-val">₺{remainingTotal.toFixed(2)}</strong>
-                    </div>
-
-                    {/* 3. Genel Toplam (En Sağda & En Odakta) */}
-                    <div className="pos-metric-card total focus-total">
-                      <span className="pos-metric-label">Genel Toplam</span>
-                      <strong className="pos-metric-val">₺{grandTotal.toFixed(2)}</strong>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
-            </div>
-          )}
+          <BillTab
+            perms={perms}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            actionDropdownItemId={actionDropdownItemId}
+            displayedSavedItems={displayedSavedItems}
+            grandTotal={grandTotal}
+            handleDeliverItem={handleDeliverItem}
+            handleSelectAllItems={handleSelectAllItems}
+            handleToggleItemSelection={handleToggleItemSelection}
+            handleUpdateItemStatus={handleUpdateItemStatus}
+            handleUpdatePayQty={handleUpdatePayQty}
+            paidTotal={paidTotal}
+            payingQuantities={payingQuantities}
+            paymentsList={paymentsList}
+            remainingTotal={remainingTotal}
+            selectedItemIds={selectedItemIds}
+            setActionDropdownItemId={setActionDropdownItemId}
+            unpaidSavedItems={unpaidSavedItems}
+          />
 
         </main>
 
@@ -2006,566 +1133,76 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
         {/* ======================================================== */}
         <aside className="pos-right-panel">
 
-          {/* -------------------------------------------------------- */}
-          {/* SAĞ PANEL DURUM 1: SEPET (FERAH VE GENİŞ TASARIM)        */}
-          {/* -------------------------------------------------------- */}
-          {activeTab === 'order' && (
-            <div className="pos-cart-panel-card" id="pos-cart-panel">
+          <CartPanel
+            perms={perms}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            cartItemCount={cartItemCount}
+            cartItems={cartItems}
+            cartTotal={cartTotal}
+            displayedSavedItems={displayedSavedItems}
+            handleCompleteOrder={handleCompleteOrder}
+            handleEmptyTable={handleEmptyTable}
+            handleRemoveFromCart={handleRemoveFromCart}
+            handleUpdateCartItemNote={handleUpdateCartItemNote}
+            handleUpdateCartQuantity={handleUpdateCartQuantity}
+            isSubmittingOrder={isSubmittingOrder}
+            openNoteProductIds={openNoteProductIds}
+            paidSavedItems={paidSavedItems}
+            remainingTotal={remainingTotal}
+            toggleNoteInput={toggleNoteInput}
+          />
 
-              {/* Sepet Başlığı */}
-              <div className="pos-cart-head">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <ShoppingBag size={18} color="#346c80" />
-                  <h3 className="pos-cart-title">Sipariş Sepeti</h3>
-                </div>
-                <span className="pos-cart-count-badge">{cartItemCount} Ürün</span>
-              </div>
-
-              {/* Masada Daha Önce Eklenmiş Kalemler Bilgisi */}
-              {displayedSavedItems.length > 0 && (
-                <div
-                  className="pos-cart-existing-orders-summary"
-                  onClick={() => setActiveTab('payment')}
-                  title="Masadaki tüm ürünleri ve adisyonu görüntülemek için tıklayın"
-                  style={{ cursor: 'pointer' }}
-                >
-                  <span>Masada: <strong>{displayedSavedItems.length} Kalem</strong></span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {paidSavedItems.length > 0 && (
-                      <span className="pos-summary-badge-paid">{paidSavedItems.length} Ödendi</span>
-                    )}
-                    <span style={{ fontSize: '0.72rem', color: '#346c80', fontWeight: 600 }}>Adisyona Git &rsaquo;</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Masada Ödenecek Bakiye Yoksa Hızlı Kapatma Butonu (İkram/İade/Tamamı Ödenmiş) */}
-              {remainingTotal <= 0.05 && displayedSavedItems.length > 0 && cartItems.length === 0 && (
-                <div style={{ padding: '0 12px 10px 12px' }}>
-                  <button
-                    type="button"
-                    onClick={handleEmptyTable}
-                    style={{
-                      width: '100%',
-                      background: 'linear-gradient(135deg, #2d6a4f 0%, #1b4332 100%)',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '10px',
-                      padding: '10px 14px',
-                      fontSize: '0.88rem',
-                      fontWeight: '800',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '7px',
-                      cursor: 'pointer',
-                      boxShadow: '0 3px 10px rgba(45, 106, 79, 0.28)'
-                    }}
-                  >
-                    <Check size={16} />
-                    <span>Masayı Kapat & Boşalt (0.00 ₺)</span>
-                  </button>
-                </div>
-              )}
-
-              {/* Sepet Kalemleri */}
-              <div className="pos-cart-items-wrap">
-                {cartItems.length === 0 ? (
-                  <div className="pos-cart-empty-state">
-                    <ShoppingBag size={38} color="#d4c9bf" />
-                    <p>Sepetiniz şu anda boş.</p>
-                    <span>Sol taraftaki menüden ürün seçebilirsiniz</span>
-                  </div>
-                ) : (
-                  cartItems.map(item => {
-                    const isNoteOpen = openNoteProductIds.includes(item.product.id) || !!item.note;
-                    return (
-                      <div key={item.product.id} className="pos-cart-item-block">
-                        <div className="pos-cart-row">
-                          {/* Küçük Önizleme */}
-                          <div className="pos-cart-row-thumb">
-                            {item.product.image_url ? (
-                              <img src={item.product.image_url} alt={item.product.name} />
-                            ) : (
-                              <Coffee size={14} color="#346c80" />
-                            )}
-                          </div>
-
-                          {/* Bilgiler (Ürün Adı ve Kalem Butonu) */}
-                          <div className="pos-cart-row-info">
-                            <div className="pos-cart-row-name-wrap">
-                              <span className="pos-cart-row-name" title={item.product.name}>
-                                {item.product.name}
-                              </span>
-                              <button
-                                type="button"
-                                className={`pos-cart-note-trigger-btn ${item.note ? 'has-note' : ''}`}
-                                onClick={() => toggleNoteInput(item.product.id)}
-                                title={item.note ? 'Sipariş Notunu Düzenle' : 'Sipariş Notu Ekle'}
-                              >
-                                <Pencil size={11} />
-                              </button>
-                            </div>
-                            <span className="pos-cart-row-unit-price">
-                              ₺{item.unit_price.toFixed(2)} / ad
-                            </span>
-                          </div>
-
-                          {/* Adet Kontrolleri */}
-                          <div className="pos-cart-stepper">
-                            <button
-                              type="button"
-                              className="pos-cart-step-btn"
-                              onClick={() => handleUpdateCartQuantity(item.product.id, -1)}
-                            >
-                              <Minus size={11} />
-                            </button>
-                            <span className="pos-cart-step-val">{item.quantity}</span>
-                            <button
-                              type="button"
-                              className="pos-cart-step-btn"
-                              onClick={() => handleUpdateCartQuantity(item.product.id, +1)}
-                            >
-                              <Plus size={11} />
-                            </button>
-                          </div>
-
-                          {/* Toplam */}
-                          <span className="pos-cart-row-total">
-                            ₺{(item.quantity * item.unit_price).toFixed(2)}
-                          </span>
-
-                          {/* Sil */}
-                          <button
-                            type="button"
-                            className="pos-cart-trash-btn"
-                            onClick={() => handleRemoveFromCart(item.product.id)}
-                            title="Sepetten Sil"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-
-                        {/* Açılır / Girilen Not Kutusu */}
-                        {isNoteOpen && (
-                          <div className="pos-cart-inline-note-box">
-                            <input
-                              type="text"
-                              className="pos-cart-note-input"
-                              placeholder="Not ekle... (Örn: Şekerli, orta, az buzlu)"
-                              value={item.note || ''}
-                              onChange={(e) => handleUpdateCartItemNote(item.product.id, e.target.value)}
-                            />
-                            {item.note && (
-                              <button
-                                type="button"
-                                className="pos-cart-note-clear-btn"
-                                onClick={() => handleUpdateCartItemNote(item.product.id, '')}
-                                title="Notu Temizle"
-                              >
-                                <X size={11} />
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-
-              {/* Sepet Alt Toplam ve Onay Butonu */}
-              <div className="pos-cart-footer">
-                <div className="pos-cart-total-row">
-                  <span className="pos-cart-total-label">Sipariş Tutarı</span>
-                  <span className="pos-cart-total-val">₺{cartTotal.toFixed(2)}</span>
-                </div>
-
-                <button
-                  type="button"
-                  className="pos-btn-submit-order"
-                  disabled={cartItems.length === 0 || isSubmittingOrder}
-                  onClick={handleCompleteOrder}
-                >
-                  {isSubmittingOrder ? (
-                    <>
-                      <div className="cat-btn-spinner"></div>
-                      <span>Sipariş İletiliyor...</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 size={18} />
-                      <span>Siparişi Onayla</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-            </div>
-          )}
-
-          {/* -------------------------------------------------------- */}
-          {/* SAĞ PANEL DURUM 2: HESAP ÖDEME & TAHSİLAT PANELİ         */}
-          {/* -------------------------------------------------------- */}
-          {activeTab === 'payment' && (
-            <div className="pos-checkout-panel-card">
-
-              {/* Üst Kısım: Tahsil Edilecek Tutar (Sol) ve Bahşiş/İndirim Altlı Üstlü (Sağ) */}
-              <div className="pos-checkout-amount-and-calc-grid">
-                {/* Sol: Büyük Tutar Göstergesi */}
-                <div className="pos-checkout-amount-display">
-                  <div className="pos-checkout-amount-info">
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                      <span className="pos-checkout-amount-label">Tahsil Edilecek Tutar</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}>
-                      <span style={{ fontFamily: 'Outfit, sans-serif', fontSize: '1.85rem', fontWeight: 900, color: finalPayableTotal > 0 ? '#1e7e34' : '#486b78' }}>₺</span>
-                      <input
-                        type="number"
-                        step="any"
-                        style={{
-                          fontFamily: 'Outfit, sans-serif',
-                          fontSize: '1.85rem',
-                          fontWeight: 900,
-                          color: finalPayableTotal > 0 ? '#1e7e34' : '#486b78',
-                          background: 'transparent',
-                          border: 'none',
-                          outline: 'none',
-                          width: '100%',
-                          padding: 0
-                        }}
-                        value={
-                          selectedItemIds.length > 0
-                            ? finalPayableTotal.toFixed(2)
-                            : isCustomAmountFocused
-                              ? customAmountToPay
-                              : (finalPayableTotal > 0 ? finalPayableTotal.toFixed(2) : (customAmountToPay !== '' ? customAmountToPay : '0.00'))
-                        }
-                        onChange={(e) => {
-                          if (selectedItemIds.length === 0) {
-                            setCustomAmountToPay(e.target.value);
-                          }
-                        }}
-                        onFocus={() => {
-                          setIsCustomAmountFocused(true);
-                          if (selectedItemIds.length === 0 && (customAmountToPay === '' || customAmountToPay === '0.00' || customAmountToPay === '0')) {
-                            setCustomAmountToPay('');
-                          }
-                        }}
-                        onBlur={() => setIsCustomAmountFocused(false)}
-                        disabled={selectedItemIds.length > 0}
-                        title={selectedItemIds.length > 0 ? 'Tablodan ürün seçildiğinde ve bahşiş/indirim girildiğinde tutar otomatik hesaplanır' : 'Ödenecek tutarı girmek için tıklayıp yazabilirsiniz'}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Sağ: Bahşiş ve İndirim (Altlı Üstlü) */}
-                <div className="pos-calc-stacked-col">
-                  {/* Bahşiş */}
-                  <div className="pos-calc-input-group compact">
-                    <div className="pos-calc-label-row">
-                      <span className="pos-calc-title">Bahşiş</span>
-                    </div>
-                    <div className="pos-calc-input-box tip compact">
-                      <input
-                        type="number"
-                        min="0"
-                        step="5"
-                        value={tipAmount || ''}
-                        onChange={(e) => setTipAmount(parseFloat(e.target.value) || 0)}
-                        placeholder="0"
-                      />
-                      <div className="pos-calc-stepper-vertical">
-                        <button type="button" onClick={() => setTipAmount(prev => (prev || 0) + 10)}>
-                          <ChevronUp size={10} />
-                        </button>
-                        <button type="button" onClick={() => setTipAmount(prev => Math.max(0, (prev || 0) - 10))}>
-                          <ChevronDown size={10} />
-                        </button>
-                      </div>
-                      <div className="pos-calc-currency-badge tip">₺</div>
-                    </div>
-                  </div>
-
-                  {/* İndirim */}
-                  <div className="pos-calc-input-group compact">
-                    <div className="pos-calc-label-row">
-                      <span className="pos-calc-title">İndirim</span>
-                    </div>
-                    <div className="pos-calc-input-box discount compact">
-                      <input
-                        type="number"
-                        min="0"
-                        step="5"
-                        value={discountAmount || ''}
-                        onChange={(e) => setDiscountAmount(parseFloat(e.target.value) || 0)}
-                        placeholder="0"
-                      />
-                      <div className="pos-calc-stepper-vertical">
-                        <button type="button" onClick={() => setDiscountAmount(prev => (prev || 0) + 10)}>
-                          <ChevronUp size={10} />
-                        </button>
-                        <button type="button" onClick={() => setDiscountAmount(prev => Math.max(0, (prev || 0) - 10))}>
-                          <ChevronDown size={10} />
-                        </button>
-                      </div>
-                      <div className="pos-calc-currency-badge discount">₺</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Dörtlü Ödeme Şekli Seçimi: Nakit / Kredi Kartı / Parçalı / Veresiye */}
-              <div className="pos-payment-method-row">
-                <button
-                  type="button"
-                  className={`pos-method-btn cash ${paymentMethod === 'cash' ? 'active' : ''}`}
-                  onClick={() => handleSelectPaymentMethod('cash')}
-                >
-                  <Banknote size={15} />
-                  <span>Nakit</span>
-                </button>
-
-                <button
-                  type="button"
-                  className={`pos-method-btn card ${paymentMethod === 'credit_card' ? 'active' : ''}`}
-                  onClick={() => handleSelectPaymentMethod('credit_card')}
-                >
-                  <CreditCard size={15} />
-                  <span>Kredi Kartı</span>
-                </button>
-
-                <button
-                  type="button"
-                  className={`pos-method-btn mixed ${paymentMethod === 'mixed' ? 'active' : ''}`}
-                  onClick={() => handleSelectPaymentMethod('mixed')}
-                >
-                  <Split size={15} />
-                  <span>Parçalı / Karma</span>
-                </button>
-
-                <button
-                  type="button"
-                  className={`pos-method-btn veresiye ${paymentMethod === 'veresiye' ? 'active' : ''}`}
-                  onClick={() => handleSelectPaymentMethod('veresiye')}
-                >
-                  <UserCheck size={15} />
-                  <span>Veresiye / Cari</span>
-                </button>
-              </div>
-
-              {/* Yönteme Göre Dinamik Alanlar */}
-              {/* Parçalı / Karma: Nakit & Kart Eş Zamanlı Dengeleme */}
-              {paymentMethod === 'mixed' && (
-                <div className="pos-mixed-calculator-box">
-                  <div className="pos-mixed-inputs-row">
-                    <div className="pos-mixed-input-field cash-field">
-                      <label><Banknote size={12} /> Nakit (₺)</label>
-                      <div className="pos-mixed-input-wrapper cash">
-                        <input
-                          type="number"
-                          step="1"
-                          placeholder="0.00"
-                          value={mixedCash}
-                          onChange={(e) => handleMixedCashChange(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <div className="pos-mixed-input-field card-field">
-                      <label><CreditCard size={12} /> Kart (₺)</label>
-                      <div className="pos-mixed-input-wrapper card">
-                        <input
-                          type="number"
-                          step="1"
-                          placeholder="0.00"
-                          value={mixedCard}
-                          onChange={(e) => handleMixedCardChange(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <div className="pos-mixed-input-field veresiye-field">
-                      <label><UserCheck size={12} /> Veresiye (₺)</label>
-                      <div className="pos-mixed-input-wrapper veresiye">
-                        <input
-                          type="number"
-                          step="1"
-                          placeholder="0.00"
-                          value={mixedVeresiye}
-                          onChange={(e) => handleMixedVeresiyeChange(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Hızlı Eşit Bölme Seçenekleri */}
-                  <div className="pos-mixed-auto-note">
-                    <span>Hızlı Dağıt:</span>
-                    <div className="pos-mixed-presets-wrap">
-                      <button type="button" className="pos-btn-mixed-half" onClick={handleSetMixedHalfCashCard} title="50% Nakit - 50% Kart">
-                        Nakit + Kart
-                      </button>
-                      <button type="button" className="pos-btn-mixed-half orange" onClick={handleSetMixedHalfCashVeresiye} title="50% Nakit - 50% Veresiye">
-                        Nakit + Veresiye
-                      </button>
-                      <button type="button" className="pos-btn-mixed-half orange" onClick={handleSetMixedHalfCardVeresiye} title="50% Kart - 50% Veresiye">
-                        Kart + Veresiye
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Veresiye Tutarı Girilmişse Müşteri Seçimi Göster */}
-                  {parseFloat(mixedVeresiye || 0) > 0 && (
-                    <div className="pos-mixed-veresiye-box">
-                      <div className="pos-mixed-veresiye-head">
-                        <div className="pos-mixed-veresiye-title">
-                          <UserCheck size={14} />
-                          <span>Veresiye Yazılacak Cari:</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span className="pos-mixed-veresiye-amt-badge">
-                            ₺{parseFloat(mixedVeresiye || 0).toFixed(2)}
-                          </span>
-                          <button
-                            type="button"
-                            className="pos-veresiye-top-add-btn"
-                            onClick={() => {
-                              setQuickCustName('');
-                              setQuickCustPhone('0');
-                              setQuickCustNotes('');
-                              setQuickCustError('');
-                              setShowQuickAddCustomerModal(true);
-                            }}
-                            title="Yeni Müşteri Ekle"
-                          >
-                            <UserPlus size={12} />
-                            <span>+ Yeni</span>
-                          </button>
-                        </div>
-                      </div>
-
-                      {renderCustomerDropdown()}
-
-                      <div className="pos-veresiye-note-field">
-                        <label className="pos-veresiye-note-label">
-                          <FileText size={12} />
-                          <span>Vade / Açıklama Notu</span>
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Örn: Kalan tutar haftaya ödenecek..."
-                          value={veresiyeNote}
-                          onChange={(e) => setVeresiyeNote(e.target.value)}
-                          className="pos-veresiye-note-input"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Veresiye / Açık Hesap Girişi */}
-              {paymentMethod === 'veresiye' && (
-                <div className="pos-veresiye-card">
-                  <div className="pos-veresiye-card-header">
-                    <div className="pos-veresiye-title-wrap">
-                      <div className="pos-veresiye-icon-pill">
-                        <UserCheck size={18} />
-                      </div>
-                      <div>
-                        <h4 className="pos-veresiye-heading">Veresiye</h4>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className="pos-veresiye-top-add-btn"
-                      onClick={() => {
-                        setQuickCustName('');
-                        setQuickCustPhone('0');
-                        setQuickCustNotes('');
-                        setQuickCustError('');
-                        setShowQuickAddCustomerModal(true);
-                      }}
-                      title="Yeni Müşteri / Cari Ekle"
-                    >
-                      <UserPlus size={14} />
-                      <span>+ Yeni Müşteri</span>
-                    </button>
-                  </div>
-
-                  {renderCustomerDropdown()}
-
-                  {/* Açıklama / Vade Notu */}
-                  <div className="pos-veresiye-note-field">
-                    <label className="pos-veresiye-note-label">
-                      <FileText size={13} />
-                      <span>Açıklama / Vade Notu <small>(İsteğe bağlı)</small></span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Örn: Yarın ödenecek / Berber dükkanına teslim..."
-                      value={veresiyeNote}
-                      onChange={(e) => setVeresiyeNote(e.target.value)}
-                      className="pos-veresiye-note-input"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Hesap Sıfırlandıysa Masayı Boşaltma Bildirimi (Ödendi, İkram veya İade/İptal) */}
-              {remainingTotal <= 0.05 && (
-                <div className="pos-all-paid-card">
-                  <CheckCircle2 size={32} color="#2d6a4f" />
-                  <h4>
-                    {paidTotal > 0
-                      ? 'Masa Hesabı Tamamen Ödendi'
-                      : savedItems.some(i => i.item_status === 'complimentary')
-                        ? 'Tüm Ürünler İkram Edildi'
-                        : 'Ödenecek Tutar Bulunmuyor'}
-                  </h4>
-                  <p>
-                    {paidTotal > 0
-                      ? 'Bu masaya ait tüm siparişlerin tahsilatı yapılmıştır.'
-                      : savedItems.some(i => i.item_status === 'complimentary')
-                        ? 'Masadaki ürünler ikram olarak verilmiştir (Kalan 0.00 ₺).'
-                        : 'Masadaki tüm ürünler iade veya iptal edilmiştir.'}
-                    {' '}Masayı kapatıp boşaltabilirsiniz.
-                  </p>
-                  <button
-                    type="button"
-                    className="pos-btn-empty-table-now"
-                    onClick={handleEmptyTable}
-                  >
-                    <Check size={16} />
-                    <span>Masayı Kapat & Boşalt</span>
-                  </button>
-                </div>
-              )}
-
-              {/* Büyük "Tahsilatı Tamamla" Butonu */}
-              {remainingTotal > 0.05 && (
-                <button
-                  type="button"
-                  className="pos-btn-confirm-payment"
-                  disabled={finalPayableTotal <= 0 || isPaying}
-                  onClick={handleConfirmPayment}
-                >
-                  {isPaying ? (
-                    <>
-                      <div className="cat-btn-spinner"></div>
-                      <span>Tahsil Ediliyor...</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 size={18} />
-                      <span>Ödemeyi Onayla (₺{finalPayableTotal.toFixed(2)})</span>
-                    </>
-                  )}
-                </button>
-              )}
-
-            </div>
-          )}
+          <PaymentPanel
+            perms={perms}
+            activeTab={activeTab}
+            basePayableAmount={basePayableAmount}
+            handleFillMixedRemaining={handleFillMixedRemaining}
+            customAmountToPay={customAmountToPay}
+            customerDropdownRef={customerDropdownRef}
+            customerSearchTerm={customerSearchTerm}
+            discountAmount={discountAmount}
+            filteredCustomers={filteredCustomers}
+            finalPayableTotal={finalPayableTotal}
+            handleConfirmPayment={handleConfirmPayment}
+            handleEmptyTable={handleEmptyTable}
+            handleMixedCardChange={handleMixedCardChange}
+            handleMixedCashChange={handleMixedCashChange}
+            handleMixedVeresiyeChange={handleMixedVeresiyeChange}
+            handleSelectPaymentMethod={handleSelectPaymentMethod}
+            handleSetMixedHalfCardVeresiye={handleSetMixedHalfCardVeresiye}
+            handleSetMixedHalfCashCard={handleSetMixedHalfCashCard}
+            handleSetMixedHalfCashVeresiye={handleSetMixedHalfCashVeresiye}
+            isCustomAmountFocused={isCustomAmountFocused}
+            isCustomerDropdownOpen={isCustomerDropdownOpen}
+            isPaying={isPaying}
+            mixedCard={mixedCard}
+            mixedCash={mixedCash}
+            mixedVeresiye={mixedVeresiye}
+            paidTotal={paidTotal}
+            paymentMethod={paymentMethod}
+            remainingTotal={remainingTotal}
+            savedItems={savedItems}
+            selectedItemIds={selectedItemIds}
+            selectedRegisteredCustomer={selectedRegisteredCustomer}
+            setCustomAmountToPay={setCustomAmountToPay}
+            setCustomerSearchTerm={setCustomerSearchTerm}
+            setDiscountAmount={setDiscountAmount}
+            setIsCustomAmountFocused={setIsCustomAmountFocused}
+            setIsCustomerDropdownOpen={setIsCustomerDropdownOpen}
+            setQuickCustError={setQuickCustError}
+            setQuickCustName={setQuickCustName}
+            setQuickCustNotes={setQuickCustNotes}
+            setQuickCustPhone={setQuickCustPhone}
+            setShowQuickAddCustomerModal={setShowQuickAddCustomerModal}
+            setTipAmount={setTipAmount}
+            setVeresiyeCustomer={setVeresiyeCustomer}
+            setVeresiyeCustomerId={setVeresiyeCustomerId}
+            setVeresiyeNote={setVeresiyeNote}
+            tipAmount={tipAmount}
+            veresiyeCustomerId={veresiyeCustomerId}
+            veresiyeNote={veresiyeNote}
+          />
 
         </aside>
 
@@ -2581,514 +1218,73 @@ export default function TableOrderModal({ table, onClose, onTableUpdated }) {
 
       </div>
 
-      {/* ======================================================== */}
-      {/* MASA ADİSYON FİŞİ YAZDIRMA PREVIEW MODALI                 */}
-      {/* ======================================================== */}
-      {showReceiptPreview && (
-        <div className="pos-receipt-modal-overlay" onClick={() => setShowReceiptPreview(false)}>
-          <div className="pos-receipt-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="pos-receipt-paper" id="printable-receipt">
-              <div className="pos-paper-header">
-                <h3 className="cafe-brand-title" style={{ fontSize: '1.25rem', justifyContent: 'center', display: 'flex' }}>
-                  <span className="brand-ozgensoy">ÖZGENSOY</span>
-                  <span className="brand-kafeterya">KAFETERYA</span>
-                </h3>
-                <p>MASA ADİSYON HESAP FİŞİ</p>
-                <div className="pos-paper-divider"></div>
-                <div className="pos-paper-meta">
-                  <span>Masa: <strong>{table.title}</strong></span>
-                  <span>Sipariş ID: <strong>{existingOrder?.order_number ? `#${existingOrder.order_number.replace(/-/g, '').slice(0, 8).toUpperCase()}` : 'YENİ'}</strong></span>
-                  <span>Tarih: {new Date().toLocaleDateString('tr-TR')} {new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>
-                </div>
-                <div className="pos-paper-divider"></div>
-              </div>
+      <ReceiptPreviewModal
+        table={table}
+        discountAmount={discountAmount}
+        displayedSavedItems={displayedSavedItems}
+        existingOrder={existingOrder}
+        finalPayableTotal={finalPayableTotal}
+        grandTotal={grandTotal}
+        paidTotal={paidTotal}
+        setShowReceiptPreview={setShowReceiptPreview}
+        showReceiptPreview={showReceiptPreview}
+        tipAmount={tipAmount}
+      />
 
-              <div className="pos-paper-items">
-                {displayedSavedItems.map(item => {
-                  const isComp = item.item_status === 'complimentary';
-                  const isRet = item.item_status === 'returned';
-                  const isCanc = item.item_status === 'cancelled';
-                  const isSpecialItem = isComp || isRet || isCanc;
-
-                  return (
-                    <div key={item.id} className="pos-paper-row">
-                      <span className="pos-paper-col-name">
-                        {item.product_name} x{item.quantity}
-                        {item.is_paid ? ' (ÖDENDİ)' : ''}
-                        {isComp ? ' (İKRAM)' : ''}
-                        {isRet ? ' (İADE)' : ''}
-                        {isCanc ? ' (İPTAL)' : ''}
-                      </span>
-                      <span
-                        className="pos-paper-col-total"
-                        style={{ textDecoration: (isRet || isCanc) ? 'line-through' : 'none' }}
-                      >
-                        ₺{isSpecialItem ? '0.00' : parseFloat(item.total_price).toFixed(2)}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="pos-paper-divider"></div>
-
-              <div className="pos-paper-totals">
-                <div className="pos-paper-row">
-                  <span>Masa Sipariş Toplamı:</span>
-                  <span>₺{grandTotal.toFixed(2)}</span>
-                </div>
-                {paidTotal > 0 && (
-                  <div className="pos-paper-row" style={{ color: '#2d6a4f' }}>
-                    <span>Önceden Ödenen:</span>
-                    <span>-₺{paidTotal.toFixed(2)}</span>
-                  </div>
-                )}
-                {parseFloat(discountAmount || 0) > 0 && (
-                  <div className="pos-paper-row">
-                    <span>İndirim:</span>
-                    <span>-₺{parseFloat(discountAmount).toFixed(2)}</span>
-                  </div>
-                )}
-                {parseFloat(tipAmount || 0) > 0 && (
-                  <div className="pos-paper-row">
-                    <span>Bahşiş:</span>
-                    <span>+₺{parseFloat(tipAmount).toFixed(2)}</span>
-                  </div>
-                )}
-                <div className="pos-paper-row total">
-                  <span>ÖDENECEK KALAN</span>
-                  <span>₺{finalPayableTotal.toFixed(2)}</span>
-                </div>
-              </div>
-
-              <div className="pos-paper-footer">
-                <p>Bizi tercih ettiğiniz için teşekkür ederiz!</p>
-                <small>Afiyet Olsun</small>
-              </div>
-            </div>
-
-            <div className="pos-receipt-modal-actions">
-              <button
-                type="button"
-                className="pos-btn-print-now"
-                onClick={() => window.print()}
-              >
-                <Printer size={16} />
-                <span>Yazdır</span>
-              </button>
-              <button
-                type="button"
-                className="pos-btn-close-paper"
-                onClick={() => setShowReceiptPreview(false)}
-              >
-                Kapat
-              </button>
-            </div>
-          </div>
-        </div>
+      {showTransferModal && (
+        <TableTransferModal
+          table={table}
+          hasUnsentCart={cartItems.length > 0}
+          showToast={showToast}
+          onClose={() => setShowTransferModal(false)}
+          onTransferred={(target) => {
+            setShowTransferModal(false);
+            onTableUpdated?.();
+            onTableSwitched?.(target);
+          }}
+        />
       )}
 
-      {/* Çoklu Adet Durum Bölme Modalı */}
-      {statusPrompt && (
-        <div className="pos-confirm-modal-overlay" onClick={() => setStatusPrompt(null)}>
-          <div className="pos-confirm-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="pos-confirm-head">
-              <h4>
-                {statusPrompt.targetStatus === 'complimentary'
-                  ? '🎁 İkram Adedi Belirleyin'
-                  : statusPrompt.targetStatus === 'returned'
-                    ? '↩️ İade Adedi Belirleyin'
-                    : statusPrompt.targetStatus === 'cancelled'
-                      ? '🚫 İptal Adedi Belirleyin'
-                      : 'Durum Güncelleme Adedi'}
-              </h4>
-              <button
-                type="button"
-                className="pos-confirm-close"
-                onClick={() => setStatusPrompt(null)}
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <p style={{ margin: '12px 0 6px 0', fontSize: '0.88rem', color: '#5c4333' }}>
-              <strong>{statusPrompt.item.product_name}</strong> ürününden masada toplam <strong>{statusPrompt.item.quantity} Adet</strong> bulunuyor.
-            </p>
-            <p style={{ margin: '0 0 16px 0', fontSize: '0.82rem', color: '#486b78' }}>
-              Kaç adeti{' '}
-              <strong>
-                {statusPrompt.targetStatus === 'complimentary'
-                  ? 'İkram'
-                  : statusPrompt.targetStatus === 'returned'
-                    ? 'İade'
-                    : statusPrompt.targetStatus === 'cancelled'
-                      ? 'İptal'
-                      : 'Teslim'}
-              </strong>{' '}
-              olarak işaretlensin?
-            </p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                type="button"
-                className="pos-btn-split-opt"
-                onClick={() => handleUpdateItemStatus(statusPrompt.item, statusPrompt.targetStatus, 1)}
-              >
-                1 Adet
-              </button>
-              <button
-                type="button"
-                className="pos-btn-split-opt primary"
-                onClick={() => handleUpdateItemStatus(statusPrompt.item, statusPrompt.targetStatus, statusPrompt.item.quantity)}
-              >
-                Tümü ({statusPrompt.item.quantity} Adet)
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <StatusSplitModal handleUpdateItemStatus={handleUpdateItemStatus} setStatusPrompt={setStatusPrompt} statusPrompt={statusPrompt} />
 
-      {/* ======================================================== */}
-      {/* MOBİL SEPET ÇEKMECESİ (SLIDE-UP BOTTOM SHEET DRAWER)     */}
-      {/* ======================================================== */}
-      {activeTab === 'order' && cartItems.length > 0 && (
-        <div
-          className={`pos-mobile-cart-drawer ${(isMobileCartDrawerOpen || isDragging) ? 'open' : ''}`}
-          aria-hidden={!isMobileCartDrawerOpen && !isDragging}
-        >
-          {/* Karartma Backdrop */}
-          <div
-            className="pos-mobile-cart-backdrop"
-            style={isDragging ? {
-              opacity: Math.max(0, Math.min(1, 1 - (dragOffsetY / (window.innerHeight * 0.75)))),
-              transition: 'none'
-            } : undefined}
-            onClick={() => {
-              setIsMobileCartDrawerOpen(false);
-              setDragOffsetY(0);
-            }}
-          />
+      <MobileCartDrawer
+        perms={perms}
+        activeTab={activeTab}
+        cartItemCount={cartItemCount}
+        cartItems={cartItems}
+        cartTotal={cartTotal}
+        dragOffsetY={dragOffsetY}
+        handleCompleteOrder={handleCompleteOrder}
+        handleRemoveFromCart={handleRemoveFromCart}
+        handleSheetTouchEnd={handleSheetTouchEnd}
+        handleSheetTouchMove={handleSheetTouchMove}
+        handleSheetTouchStart={handleSheetTouchStart}
+        handleUpdateCartItemNote={handleUpdateCartItemNote}
+        handleUpdateCartQuantity={handleUpdateCartQuantity}
+        isDragging={isDragging}
+        isMobileCartDrawerOpen={isMobileCartDrawerOpen}
+        isSubmittingOrder={isSubmittingOrder}
+        openNoteProductIds={openNoteProductIds}
+        setDragOffsetY={setDragOffsetY}
+        setIsMobileCartDrawerOpen={setIsMobileCartDrawerOpen}
+        toggleNoteInput={toggleNoteInput}
+      />
 
-          {/* Çekmece Gövdesi (Sabit %75 Yükseklik & Anlık Sürükleme Takibi) */}
-          <div
-            className="pos-mobile-cart-sheet"
-            style={isDragging ? {
-              transform: `translateY(${dragOffsetY}px)`,
-              transition: 'none'
-            } : undefined}
-          >
-            {/* Sürükleme Çubuğu (Drag Handle) */}
-            <div
-              className="pos-sheet-drag-handle-wrap"
-              onTouchStart={handleSheetTouchStart}
-              onTouchMove={handleSheetTouchMove}
-              onTouchEnd={handleSheetTouchEnd}
-              onClick={() => {
-                setIsMobileCartDrawerOpen(false);
-                setDragOffsetY(0);
-              }}
-              title="Aşağı sürükleyerek kapat"
-            >
-              <div className="pos-sheet-drag-handle" />
-            </div>
+      <QuickCustomerModal
+        handleSaveQuickCustomer={handleSaveQuickCustomer}
+        isSubmittingQuickCust={isSubmittingQuickCust}
+        quickCustError={quickCustError}
+        quickCustName={quickCustName}
+        quickCustNotes={quickCustNotes}
+        quickCustPhone={quickCustPhone}
+        setQuickCustError={setQuickCustError}
+        setQuickCustName={setQuickCustName}
+        setQuickCustNotes={setQuickCustNotes}
+        setQuickCustPhone={setQuickCustPhone}
+        setShowQuickAddCustomerModal={setShowQuickAddCustomerModal}
+        showQuickAddCustomerModal={showQuickAddCustomerModal}
+      />
 
-            {/* Başlık ve Kapat Butonu */}
-            <div
-              className="pos-sheet-header"
-              onTouchStart={handleSheetTouchStart}
-              onTouchMove={handleSheetTouchMove}
-              onTouchEnd={handleSheetTouchEnd}
-            >
-              <div className="pos-sheet-header-left">
-                <ShoppingBag size={18} color="#346c80" />
-                <h3 className="pos-sheet-title">Sipariş Sepeti</h3>
-                <span className="pos-sheet-count-badge">{cartItemCount} Ürün</span>
-              </div>
-              <button
-                type="button"
-                className="pos-sheet-close-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsMobileCartDrawerOpen(false);
-                  setDragOffsetY(0);
-                }}
-                title="Sepeti Kapat (Menüye Dön)"
-              >
-                <X size={17} />
-              </button>
-            </div>
-
-            {/* Sepet Ürünleri Listesi */}
-            <div className="pos-sheet-items-scroll">
-              {cartItems.map(item => {
-                const isNoteOpen = openNoteProductIds.includes(item.product.id) || !!item.note;
-                return (
-                  <div key={item.product.id} className="pos-sheet-item-card">
-                    {/* 1. Satır: Görsel, Ürün Adı (Tam Genişlik), Birim Fiyat & Silme Butonu */}
-                    <div className="pos-sheet-item-top-row">
-                      <div className="pos-sheet-item-thumb">
-                        {item.product.image_url ? (
-                          <img src={item.product.image_url} alt={item.product.name} />
-                        ) : (
-                          <Coffee size={18} color="#346c80" />
-                        )}
-                      </div>
-
-                      <div className="pos-sheet-item-info">
-                        <strong className="pos-sheet-item-name" title={item.product.name}>
-                          {item.product.name}
-                        </strong>
-                        <div className="pos-sheet-item-subline">
-                          <span className="pos-sheet-item-unit-price">
-                            ₺{item.unit_price.toFixed(2)} / ad
-                          </span>
-                          {item.note && !isNoteOpen && (
-                            <span className="pos-sheet-note-preview-badge" title={item.note}>
-                              <Pencil size={10} />
-                              <span>"{item.note}"</span>
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="pos-sheet-trash-btn"
-                        onClick={() => handleRemoveFromCart(item.product.id)}
-                        title="Ürünü Çıkar"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
-
-                    {/* 2. Satır: Not Ekle Butonu (Sol) & Stepper + Toplam Tutar (Sağ) */}
-                    <div className="pos-sheet-item-bottom-row">
-                      <button
-                        type="button"
-                        className={`pos-sheet-note-btn ${item.note ? 'has-note' : ''}`}
-                        onClick={() => toggleNoteInput(item.product.id)}
-                        title={item.note ? 'Sipariş Notunu Düzenle' : 'Sipariş Notu Ekle'}
-                      >
-                        <Pencil size={11} />
-                        <span>{item.note ? 'Notu Düzenle' : '+ Not Ekle'}</span>
-                      </button>
-
-                      <div className="pos-sheet-controls-group">
-                        <div className="pos-sheet-stepper">
-                          <button
-                            type="button"
-                            className="pos-sheet-step-btn"
-                            onClick={() => handleUpdateCartQuantity(item.product.id, -1)}
-                          >
-                            <Minus size={13} />
-                          </button>
-                          <span className="pos-sheet-step-val">{item.quantity}</span>
-                          <button
-                            type="button"
-                            className="pos-sheet-step-btn"
-                            onClick={() => handleUpdateCartQuantity(item.product.id, +1)}
-                          >
-                            <Plus size={13} />
-                          </button>
-                        </div>
-
-                        <span className="pos-sheet-item-total">
-                          ₺{(item.quantity * item.unit_price).toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* 3. Satır: Açılır Not Alanı */}
-                    {isNoteOpen && (
-                      <div className="pos-sheet-note-box">
-                        <input
-                          type="text"
-                          className="pos-sheet-note-input"
-                          placeholder="Sipariş notu ekleyin (örn: Az şekerli, soğuk süt...)"
-                          value={item.note || ''}
-                          onChange={(e) => handleUpdateCartItemNote(item.product.id, e.target.value)}
-                        />
-                        {item.note && (
-                          <button
-                            type="button"
-                            className="pos-sheet-note-clear-btn"
-                            onClick={() => handleUpdateCartItemNote(item.product.id, '')}
-                          >
-                            <X size={13} />
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Çekmece Alt Kısmı: Toplam ve Onayla Butonu */}
-            <div className="pos-sheet-footer">
-              <div className="pos-sheet-total-bar">
-                <div className="pos-sheet-total-text">
-                  <span>Toplam Tutar:</span>
-                  <strong>₺{cartTotal.toFixed(2)}</strong>
-                </div>
-                <span className="pos-sheet-item-count-sub">({cartItemCount} Ürün)</span>
-              </div>
-
-              <button
-                type="button"
-                className="pos-sheet-submit-btn"
-                disabled={cartItems.length === 0 || isSubmittingOrder}
-                onClick={handleCompleteOrder}
-              >
-                {isSubmittingOrder ? (
-                  <>
-                    <div className="cat-btn-spinner" style={{ borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#ffffff' }}></div>
-                    <span>Sipariş Mutfağa İletiliyor...</span>
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 size={18} />
-                    <span>Siparişi Onayla</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Yeni Müşteri / Cari Ekleme Modalı */}
-      {showQuickAddCustomerModal && (
-        <div className="pos-receipt-modal-overlay" style={{ zIndex: 1400 }} onClick={() => setShowQuickAddCustomerModal(false)}>
-          <div className="cust-modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="cust-modal-head">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div className="cust-modal-icon">
-                  <UserPlus size={20} />
-                </div>
-                <div>
-                  <h3 className="cust-modal-title">Yeni Müşteri / Cari Ekle</h3>
-                  <p className="cust-modal-subtitle">
-                    Hesabı bu müşteriye yazmak için müşteri kartı oluşturun.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="cust-modal-close-btn"
-                onClick={() => setShowQuickAddCustomerModal(false)}
-                title="Kapat"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveQuickCustomer} className="cust-modal-form">
-              {quickCustError && (
-                <div className="cust-form-alert danger">
-                  <AlertCircle size={16} />
-                  <span>{quickCustError}</span>
-                </div>
-              )}
-
-              {/* İsim Alanı (Zorunlu + Otomatik Title Case) */}
-              <div className="cust-form-group">
-                <label className="cust-form-label">
-                  Müşteri Adı Soyadı <span className="req">* (Zorunlu)</span>
-                </label>
-                <div className="cust-input-wrapper">
-                  <User size={16} className="cust-input-icon" />
-                  <input
-                    type="text"
-                    required
-                    placeholder="Örn: Ahmet Can Yılmaz"
-                    value={quickCustName}
-                    onChange={(e) => {
-                      setQuickCustName(toTitleCaseTr(e.target.value));
-                      if (quickCustError) setQuickCustError('');
-                    }}
-                    autoFocus
-                    className="cust-input"
-                  />
-                </div>
-              </div>
-
-              {/* Telefon Alanı (Başında silinemez '0') */}
-              <div className="cust-form-group">
-                <label className="cust-form-label">
-                  Telefon Numarası <span className="opt">(İsteğe bağlı)</span>
-                </label>
-                <div className="cust-input-wrapper">
-                  <Phone size={16} className="cust-input-icon" />
-                  <input
-                    type="tel"
-                    placeholder="05XXXXXXXXX"
-                    value={quickCustPhone}
-                    onChange={(e) => {
-                      setQuickCustPhone(formatLeadingZeroPhone(e.target.value));
-                    }}
-                    onKeyDown={(e) => {
-                      if ((e.key === 'Backspace' || e.key === 'Delete') && e.target.selectionStart <= 1 && quickCustPhone.length <= 1) {
-                        e.preventDefault();
-                      }
-                    }}
-                    className="cust-input font-mono"
-                  />
-                </div>
-                <span className="cust-input-hint">
-                  Başlangıçtaki "0" sabittir.
-                </span>
-              </div>
-
-              {/* Açıklama / Not */}
-              <div className="cust-form-group">
-                <label className="cust-form-label">
-                  Kısa Açıklama & Not <span className="opt">(İsteğe bağlı)</span>
-                </label>
-                <div className="cust-input-wrapper">
-                  <FileText size={16} className="cust-input-icon" style={{ alignSelf: 'flex-start', marginTop: '10px' }} />
-                  <textarea
-                    rows="2"
-                    placeholder="Örn: Berber Ali, komşu esnaf, mavi arabalı müşteri vb."
-                    value={quickCustNotes}
-                    onChange={(e) => setQuickCustNotes(e.target.value)}
-                    className="cust-textarea"
-                  ></textarea>
-                </div>
-              </div>
-
-              {/* Form Butonları */}
-              <div className="cust-modal-foot">
-                <button
-                  type="button"
-                  className="cust-btn-cancel"
-                  onClick={() => setShowQuickAddCustomerModal(false)}
-                  disabled={isSubmittingQuickCust}
-                >
-                  Vazgeç
-                </button>
-                <button
-                  type="submit"
-                  className="customers-btn-primary"
-                  disabled={isSubmittingQuickCust}
-                >
-                  {isSubmittingQuickCust ? 'Kaydediliyor...' : 'Kaydet ve Seç'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Toast Bildirimi */}
-      {toast && (
-        <div className={`cat-toast ${toast.type || 'info'}`} style={{ zIndex: 1300 }}>
-          <div className="cat-toast-icon">
-            {toast.type === 'success' && <CheckCircle2 size={20} color="#4ade80" />}
-            {toast.type === 'danger' && <AlertCircle size={20} color="#f87171" />}
-            {toast.type === 'info' && <Sparkles size={20} color="#e5a968" />}
-          </div>
-          <span>{toast.message}</span>
-        </div>
-      )}
 
     </div>
   );

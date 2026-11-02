@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { io } from 'socket.io-client';
+import { useToast } from './ui/ToastProvider';
+import { apiFetch, createSocket } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import Sidebar from './Sidebar';
 import Navbar from './Navbar';
@@ -96,7 +97,9 @@ const getElapsedTimeInfo = (createdAt) => {
 };
 
 export default function Kitchen() {
-  const { user } = useAuth();
+  const { user, canAny } = useAuth();
+  // Hazırlık durumunu değiştirme yetkisi (yoksa ekran yalnızca izlenir)
+  const canUpdateKitchen = canAny(['kitchen.update', 'pos.deliver']);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Mutfak Verileri
@@ -135,12 +138,7 @@ export default function Kitchen() {
     }));
   };
 
-  // Toast Bildirimleri
-  const [toast, setToast] = useState(null);
-  const showToast = (message, type = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
+  const { showToast } = useToast(); // Global bildirimler (üst ortada, türe göre)
 
   // Zaman Takibi (Her 15 saniyede bir süreleri güncelle)
   const [, setClockTicker] = useState(0);
@@ -181,10 +179,7 @@ export default function Kitchen() {
   const fetchKitchenOrders = async (isSilent = false) => {
     try {
       if (!isSilent) setLoading(true);
-      const token = localStorage.getItem('kafe_token');
-      const res = await fetch('/api/orders/kitchen', {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
-      });
+      const res = await apiFetch('/api/orders/kitchen');
       const data = await res.json();
       if (data.success) {
         setOrders(data.orders || []);
@@ -209,7 +204,7 @@ export default function Kitchen() {
 
   // Socket.io Gerçek Zamanlı Dinleyiciler
   useEffect(() => {
-    const socket = io();
+    const socket = createSocket();
 
     socket.on('order:created', (data) => {
       fetchKitchenOrders(true);
@@ -239,13 +234,9 @@ export default function Kitchen() {
   // Tek Bir Kalemin Durumunu Değiştir
   const handleUpdateItemStatus = async (itemId, newStatus) => {
     try {
-      const token = localStorage.getItem('kafe_token');
-      const res = await fetch(`/api/orders/items/${itemId}/status`, {
+      const res = await apiFetch(`/api/orders/items/${itemId}/status`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
       });
 
@@ -283,13 +274,9 @@ export default function Kitchen() {
   // Masadaki Tüm Ürünleri Tek Tıkla Teslim Et
   const handleDeliverAllTable = async (tableId, tableTitle) => {
     try {
-      const token = localStorage.getItem('kafe_token');
-      const res = await fetch(`/api/orders/kitchen/table/${tableId}/deliver-all`, {
+      const res = await apiFetch(`/api/orders/kitchen/table/${tableId}/deliver-all`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        }
+        headers: { 'Content-Type': 'application/json' }
       });
 
       const data = await res.json();
@@ -398,29 +385,6 @@ export default function Kitchen() {
         }
       />
 
-      {/* Toast Bildirim Kutusu */}
-      {toast && (
-        <div style={{
-          position: 'fixed',
-          top: '20px',
-          right: '20px',
-          zIndex: 9999,
-          background: toast.type === 'danger' ? '#dc2626' : toast.type === 'info' ? '#0284c7' : '#15803d',
-          color: '#ffffff',
-          padding: '10px 18px',
-          borderRadius: '10px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          fontWeight: 700,
-          fontSize: '0.88rem',
-          fontFamily: "'Outfit', sans-serif"
-        }}>
-          {toast.type === 'danger' ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
-          <span>{toast.message}</span>
-        </div>
-      )}
 
       {/* Ana KDS Paneli */}
       <div style={{ marginTop: '12px' }}>
@@ -742,6 +706,7 @@ export default function Kitchen() {
                             {/* Mutfakta -> Hazırla & Teslim Et */}
                             {item.item_status === 'pending' && (
                               <>
+                                {canUpdateKitchen && (
                                 <button
                                   type="button"
                                   className="kds-btn-action prepare"
@@ -751,6 +716,8 @@ export default function Kitchen() {
                                   <Flame size={12} />
                                   <span>Hazırla</span>
                                 </button>
+                                )}
+                                {canUpdateKitchen && (
                                 <button
                                   type="button"
                                   className="kds-btn-action deliver"
@@ -760,12 +727,14 @@ export default function Kitchen() {
                                   <Check size={13} />
                                   <span>Teslim</span>
                                 </button>
+                                )}
                               </>
                             )}
 
                             {/* Hazırlanıyor -> Geri Al, Hazır & Teslim Et */}
                             {item.item_status === 'preparing' && (
                               <>
+                                {canUpdateKitchen && (
                                 <button
                                   type="button"
                                   className="kds-btn-action undo"
@@ -774,6 +743,8 @@ export default function Kitchen() {
                                 >
                                   <RotateCcw size={11} />
                                 </button>
+                                )}
+                                {canUpdateKitchen && (
                                 <button
                                   type="button"
                                   className="kds-btn-action ready"
@@ -783,6 +754,8 @@ export default function Kitchen() {
                                   <Sparkles size={12} />
                                   <span>Hazır</span>
                                 </button>
+                                )}
+                                {canUpdateKitchen && (
                                 <button
                                   type="button"
                                   className="kds-btn-action deliver"
@@ -792,12 +765,14 @@ export default function Kitchen() {
                                   <Check size={13} />
                                   <span>Teslim</span>
                                 </button>
+                                )}
                               </>
                             )}
 
                             {/* Hazır -> Geri Al & Teslim Et */}
                             {item.item_status === 'ready' && (
                               <>
+                                {canUpdateKitchen && (
                                 <button
                                   type="button"
                                   className="kds-btn-action undo"
@@ -806,6 +781,8 @@ export default function Kitchen() {
                                 >
                                   <RotateCcw size={11} />
                                 </button>
+                                )}
+                                {canUpdateKitchen && (
                                 <button
                                   type="button"
                                   className="kds-btn-action deliver"
@@ -815,6 +792,7 @@ export default function Kitchen() {
                                   <Check size={14} />
                                   <span>Teslim Et</span>
                                 </button>
+                                )}
                               </>
                             )}
                           </div>
@@ -866,6 +844,7 @@ export default function Kitchen() {
                                           <span className="kds-delivered-badge-compact">
                                             <Check size={12} color="#16a34a" /> Teslim
                                           </span>
+                                          {canUpdateKitchen && (
                                           <button
                                             type="button"
                                             className="kds-btn-action undo"
@@ -874,6 +853,7 @@ export default function Kitchen() {
                                           >
                                             <RotateCcw size={11} />
                                           </button>
+                                          )}
                                         </div>
                                       </div>
                                     );
@@ -911,6 +891,7 @@ export default function Kitchen() {
                                     <span className="kds-delivered-badge-compact">
                                       <Check size={12} color="#16a34a" /> Teslim Edildi
                                     </span>
+                                    {canUpdateKitchen && (
                                     <button
                                       type="button"
                                       className="kds-btn-action undo"
@@ -920,6 +901,7 @@ export default function Kitchen() {
                                       <RotateCcw size={11} />
                                       <span>Geri Al</span>
                                     </button>
+                                    )}
                                   </div>
                                 </div>
                               );
@@ -931,6 +913,7 @@ export default function Kitchen() {
 
                     {/* Fiş Altı: Tüm Masayı Tek Tıkla Teslim Et (SABİT ALT) */}
                     <div className="kds-ticket-footer">
+                      {canUpdateKitchen && (
                       <button
                         type="button"
                         className="kds-btn-deliver-all"
@@ -943,6 +926,7 @@ export default function Kitchen() {
                           {order.hasPendingOrPreparing ? 'Tüm Masayı Teslim Et' : 'Tümü Teslim Edildi'}
                         </span>
                       </button>
+                      )}
                     </div>
                   </div>
                 );

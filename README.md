@@ -33,19 +33,26 @@ npm install
 # Frontend geliştirici sunucusunu başlatın
 npm run dev
 ```
-* Frontend Arayüzü: `http://localhost:5173`
+* Frontend Arayüzü: `http://localhost:3000`
 
 ---
 
-## 📌 Varsayılan Giriş Bilgileri
-Veritabanı otomatik olarak oluşturulur ve aşağıdaki kullanıcılar tanımlanır:
+## 📌 İlk Giriş
+Kullanıcı tablosu boşsa sistem ilk açılışta yalnızca `backend/.env` içindeki `DEV_ACCOUNT_*` bilgileriyle gizli bir geliştirici hesabı oluşturur (yönetici yetkisinde, personel listesinde görünmez).
+İşletme sahibi ve personel hesapları bu hesapla giriş yapılıp **Personel Yönetimi** sayfasından oluşturulur.
 
-* **Yönetici (İşletme Sahibi):**
-  * Kullanıcı Adı: `admin`
-  * Şifre: `admin123`
-* **Kasa Görevlisi:**
-  * Kullanıcı Adı: `kasa`
-  * Şifre: `kasa123`
-* **Mutfak Ekranı:**
-  * Kullanıcı Adı: `mutfak`
-  * Şifre: `mutfak123`
+---
+
+## 🧪 Testler
+Sipariş ve ödeme akışları gerçek API üzerinden test edilir. Testler geçici, ayrı bir veritabanı açar ve bitince siler; gerçek verilere dokunmaz (MySQL çalışıyor olmalı).
+```bash
+npm --prefix backend test
+```
+
+## 💾 Veritabanı Yedeği
+```bash
+npm --prefix backend run backup
+```
+Yedek `backend/backups/` klasörüne tarihli `.sql` dosyası olarak yazılır; en yeni 30 yedek tutulur (`BACKUP_KEEP` ile değiştirilebilir).
+`mysqldump` bulunamazsa `backend/.env` içine `MYSQLDUMP_PATH` ekleyin. Her gün otomatik yedek için bu komutu Windows Görev Zamanlayıcı'ya ekleyin.
+Geri yükleme: `mysql -u root -p kafe_otomasyon < backend/backups/<dosya>.sql`

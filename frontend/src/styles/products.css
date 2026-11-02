@@ -1,0 +1,780 @@
+/* ======================================================== */
+/* ÜRÜN YÖNETİMİ (PRODUCTS) SAYFASI ÖZEL STİLLERİ           */
+/* ======================================================== */
+
+/* Arama ve Kategori Dropdown Filtre Barı */
+.prod-search-filter-box {
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1.5px solid #b6ced6;
+  border-radius: 9999px;
+  padding: 6px 14px 6px 16px;
+  width: 100%;
+  max-width: 680px;
+  box-shadow: 0 4px 18px rgba(27, 65, 79, 0.06);
+  transition: all 0.2s ease;
+  gap: 12px;
+}
+
+.prod-search-filter-box:focus-within {
+  border-color: #346c80;
+  box-shadow: 0 6px 24px rgba(52, 108, 128, 0.12);
+  transform: translateY(-1px);
+}
+
+.prod-category-select-wrap {
+  display: flex;
+  align-items: center;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.prod-cat-dropdown-filter {
+  appearance: none;
+  -webkit-appearance: none;
+  background: #dbe9ee;
+  border: 1px solid #b6ced6;
+  border-radius: 9999px;
+  padding: 7px 32px 7px 14px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #1b414f;
+  cursor: pointer;
+  outline: none;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  max-width: 210px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prod-cat-dropdown-filter:hover {
+  background: #d3e5eb;
+  border-color: #cbb8a6;
+}
+
+.prod-cat-dropdown-filter:focus {
+  border-color: #346c80;
+  background: #ffffff;
+}
+
+.prod-cat-select-arrow {
+  position: absolute;
+  right: 12px;
+  pointer-events: none;
+}
+
+.prod-filter-divider {
+  width: 1px;
+  height: 26px;
+  background: #b6ced6;
+  flex-shrink: 0;
+}
+
+.prod-search-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.prod-search-input-wrap input {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.98rem;
+  color: #1e292d;
+  width: 100%;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+}
+
+.prod-search-input-wrap input::placeholder {
+  color: #5d818f;
+}
+
+@media (max-width: 640px) {
+  .cat-search-centered-wrapper {
+    padding: 0 4px;
+    margin-bottom: 14px;
+  }
+
+  .prod-search-filter-box {
+    border-radius: 16px;
+    padding: 8px 12px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    max-width: 100%;
+  }
+
+  .prod-category-select-wrap {
+    width: 100%;
+  }
+
+  .prod-cat-dropdown-filter {
+    max-width: 100%;
+    width: 100%;
+    padding: 8px 32px 8px 12px;
+    font-size: 0.84rem;
+  }
+
+  .prod-filter-divider {
+    display: none;
+  }
+
+  .prod-search-input-wrap {
+    width: 100%;
+  }
+
+  .prod-search-input-wrap input {
+    font-size: 0.9rem;
+  }
+}
+
+/* 3 Kolonlu Hizalanmış Ürün Bilgi Alanı */
+.prod-columns-container {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
+}
+
+.prod-col-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.prod-col-category {
+  width: 150px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.prod-col-price {
+  width: 150px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Tablet & dar masaüstü: Sağdaki aksiyon butonları yer kapladığı için ürün adı
+   0 genişliğe düşmesin; ad üstte tam satır, kategori ve fiyat altında yer alır */
+@media (max-width: 1279px) {
+  .prod-columns-container {
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+  .prod-col-name {
+    flex: 0 0 100%;
+  }
+  .prod-col-category,
+  .prod-col-price {
+    width: auto;
+  }
+}
+
+@media (max-width: 767px) {
+  .prod-columns-container {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 4px 10px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .prod-col-name {
+    width: 100% !important;
+    flex: 0 0 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-wrap: wrap !important;
+  }
+
+  .prod-col-name .cat-row-title {
+    font-size: 1.05rem !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    line-height: 1.25 !important;
+    margin: 0 !important;
+  }
+
+  .prod-col-category {
+    width: auto !important;
+    flex-shrink: 0 !important;
+  }
+
+  .prod-col-price {
+    width: auto !important;
+    flex-shrink: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-wrap: wrap !important;
+  }
+
+  .prod-price-val {
+    font-size: 0.96rem !important;
+  }
+
+  .prod-cost-val {
+    font-size: 0.72rem !important;
+  }
+}
+
+.prod-category-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  background: #d3e5eb;
+  color: #346c80;
+  font-size: 0.74rem;
+  font-weight: 700;
+  border-radius: 6px;
+  border: 1px solid #b6ced6;
+  flex-shrink: 0;
+}
+
+.prod-price-val {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #1e7e34;
+  letter-spacing: -0.2px;
+}
+
+.prod-cost-val {
+  font-size: 0.74rem;
+  color: #486b78;
+  background: #dbe9ee;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px dashed #dfd4c8;
+}
+
+.prod-desc-snippet {
+  font-size: 0.78rem;
+  color: #324f5a;
+  margin-top: 2px;
+  max-width: 480px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prod-ingredients-snippet {
+  font-size: 0.72rem;
+  color: #486b78;
+  font-style: italic;
+  margin-top: 1px;
+  max-width: 480px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Modal İçin 2 Kolonlu Grid */
+.prod-form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 520px) {
+  .prod-form-grid-2 {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+.prod-modal-wide {
+  max-width: 520px !important;
+}
+
+.prod-form-textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid #b6ced6;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 58px;
+  max-height: 120px;
+}
+
+.prod-form-textarea:focus {
+  border-color: #346c80;
+  box-shadow: 0 0 0 3px rgba(52, 108, 128, 0.12);
+}
+
+.prod-form-select {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #b6ced6;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  outline: none;
+  background-color: #ffffff;
+  color: #1e292d;
+  font-family: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.prod-form-select:focus {
+  border-color: #346c80;
+  box-shadow: 0 0 0 3px rgba(52, 108, 128, 0.12);
+}
+
+.prod-currency-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.prod-currency-symbol {
+  position: absolute;
+  left: 12px;
+  font-weight: 700;
+  color: #346c80;
+  font-size: 0.95rem;
+  pointer-events: none;
+}
+
+.prod-currency-input {
+  padding-left: 28px !important;
+}
+
+/* ======================================================== */
+/* EXCEL DIŞA AKTARMA POPUP VE 2 KOLONLU DÜZEN             */
+/* ======================================================== */
+.export-modal-dialog {
+  max-width: 740px !important;
+  width: 95% !important;
+  padding: 24px 28px !important;
+  border-radius: 20px !important;
+}
+
+.export-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #b6ced6;
+}
+
+.export-modal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.export-modal-icon-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #eaf6ed;
+  color: #1e7e34;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #a3d9b0;
+  box-shadow: 0 2px 6px rgba(30, 126, 52, 0.12);
+  flex-shrink: 0;
+}
+
+.export-modal-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #1e292d;
+  letter-spacing: -0.2px;
+}
+
+.export-modal-subtitle {
+  margin: 2px 0 0 0;
+  font-size: 0.8rem;
+  color: #486b78;
+}
+
+/* 2 Kolonlu Bölüm: Solda Kategoriler, Sağda Sütunlar */
+.export-columns-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 8px;
+}
+
+.export-split-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: #f8fbfc;
+  border: 1px solid #b6ced6;
+  border-radius: 14px;
+  padding: 14px 14px 12px 14px;
+  box-shadow: 0 1px 3px rgba(52, 108, 128, 0.04);
+}
+
+.export-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  min-height: 24px;
+}
+
+.export-section-title {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #1b414f;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.export-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.export-quick-btn {
+  background: none;
+  border: none;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #346c80;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.export-quick-btn:hover {
+  background: #cce2e9;
+  color: #1b414f;
+}
+
+/* Dikey Aşağı Kaydırılabilir Liste (20-30+ eleman için kusursuz) */
+.export-scroll-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-height: 310px;
+  min-height: 180px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+/* Şık Kaydırma Çubuğu */
+.export-scroll-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.export-scroll-list::-webkit-scrollbar-track {
+  background: #f4ecdf;
+  border-radius: 4px;
+}
+
+.export-scroll-list::-webkit-scrollbar-thumb {
+  background: #6293a3;
+  border-radius: 4px;
+}
+
+.export-scroll-list::-webkit-scrollbar-thumb:hover {
+  background: #b59169;
+}
+
+.export-check-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 11px;
+  border: 1.5px solid #b6ced6;
+  border-radius: 10px;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.export-check-card:hover {
+  background: #cce2e9;
+  border-color: #6293a3;
+}
+
+.export-check-card.checked {
+  background: #ffffff;
+  border-color: #346c80;
+  box-shadow: 0 1px 4px rgba(52, 108, 128, 0.08);
+}
+
+.export-check-card.disabled-locked {
+  opacity: 0.75;
+  cursor: default;
+  background: #dbe9ee;
+}
+
+.export-check-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.export-check-input {
+  width: 16px;
+  height: 16px;
+  accent-color: #346c80;
+  cursor: pointer;
+  margin: 0;
+}
+
+.export-check-text {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #1e292d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.export-check-card.checked .export-check-text {
+  color: #346c80;
+  font-weight: 700;
+}
+
+.export-badge-tag {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: #eee6dc;
+  color: #324f5a;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.export-badge-tag.highlight {
+  background: #fdf2f0;
+  color: #b84a39;
+  border: 1px solid #f6cfc7;
+}
+
+.export-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #b6ced6;
+  gap: 12px;
+}
+
+.export-summary-text {
+  font-size: 0.8rem;
+  color: #486b78;
+  font-weight: 600;
+}
+
+.export-footer-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.export-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border-radius: 10px;
+  background: #1e7e34;
+  color: #ffffff;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(30, 126, 52, 0.22);
+}
+
+.export-download-btn:hover:not(:disabled) {
+  background: #18662a;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(30, 126, 52, 0.3);
+}
+
+.export-download-btn:disabled {
+  background: #a89280;
+  cursor: not-allowed;
+  opacity: 0.6;
+  box-shadow: none;
+  transform: none;
+}
+
+/* ======================================================== */
+/* MOBİL DUYARLILIK (RESPONSIVE) İNCE AYARLAR                */
+/* ======================================================== */
+
+/* 1. Üst Bar Aksiyon Butonları (Mobilde taşmayı önleme) */
+@media (max-width: 540px) {
+  .pos-actions-mobile .pos-edit-btn {
+    padding: 7px 10px !important;
+    font-size: 0.8rem !important;
+    min-height: 36px !important;
+  }
+  .pos-actions-mobile .pos-edit-btn span {
+    display: none !important; /* Mobilde taşmayı önlemek için sadece ikon gösterilir */
+  }
+  .pos-actions-mobile .pos-logout-btn {
+    padding: 7px 10px !important;
+    min-height: 36px !important;
+  }
+}
+
+/* 2. Ürün & Kategori Satırı Aksiyon Butonları (Dar ekranlarda tek satırda hizalı) */
+@media (max-width: 460px) {
+  .cat-row-actions {
+    flex-wrap: nowrap !important;
+    gap: 5px !important;
+    justify-content: space-between !important;
+  }
+
+  .cat-row-actions > * {
+    flex-shrink: 0;
+  }
+
+  .cat-action-btn {
+    padding: 6px 9px !important;
+  }
+
+  .cat-qr-btn {
+    padding: 6px 8px !important;
+  }
+
+  .cat-status-switch-wrapper {
+    padding: 0 !important;
+  }
+}
+
+/* 3. Modal ve Popup Diyalogları Mobil Uyumu */
+@media (max-width: 576px) {
+  .pos-modal-overlay {
+    padding: 10px !important;
+  }
+
+  .pos-modal-content {
+    padding: 20px 14px !important;
+    border-radius: 18px !important;
+    max-height: 94vh !important;
+  }
+
+  .cat-modal-header-compact {
+    margin-bottom: 12px !important;
+    padding-bottom: 10px !important;
+  }
+
+  .cat-modal-footer-compact {
+    gap: 8px !important;
+  }
+
+  .cat-btn-primary,
+  .cat-btn-secondary,
+  .cat-btn-danger {
+    padding: 9px 14px !important;
+    font-size: 0.85rem !important;
+  }
+
+  /* Excel Dışa Aktarma Modalı Mobil */
+  .export-modal-dialog {
+    padding: 18px 14px !important;
+    border-radius: 18px !important;
+  }
+
+  .export-modal-header {
+    margin-bottom: 12px !important;
+    padding-bottom: 10px !important;
+  }
+
+  .export-modal-icon-badge {
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 10px !important;
+  }
+
+  .export-modal-title {
+    font-size: 1.02rem !important;
+  }
+
+  .export-modal-subtitle {
+    font-size: 0.75rem !important;
+  }
+
+  .export-columns-split {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .export-split-col {
+    padding: 10px 10px 8px 10px !important;
+  }
+
+  .export-scroll-list {
+    max-height: 180px !important;
+    min-height: 130px !important;
+  }
+
+  .export-modal-footer {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  .export-summary-text {
+    text-align: center !important;
+    font-size: 0.78rem !important;
+  }
+
+  .export-footer-buttons {
+    display: flex !important;
+    width: 100% !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+  }
+
+  .export-footer-buttons button {
+    flex: 1 !important;
+    justify-content: center !important;
+    padding: 9px 12px !important;
+    font-size: 0.82rem !important;
+  }
+}

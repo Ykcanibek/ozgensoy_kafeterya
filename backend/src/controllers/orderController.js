@@ -2,38 +2,98 @@ import crypto from 'crypto';
 import { pool } from '../config/db.js';
 import { getUserFromReq, logActivity } from '../config/auditLogger.js';
 import { formatTitleCase } from './customerController.js';
+import { can, canAny, deny } from '../middleware/auth.js';
+
+// Tek kalemde girilebilecek en yüksek adet
+const MAX_ITEM_QTY = 999;
+// İkram/iade/iptal edilmiş kalemler: bu durumdan çıkarmak, o durumu verme yetkisini de ister
+const LOSS_STATUSES = ['cancelled', 'returned', 'complimentary'];
 
 /**
  * Kullanıcının Kuralı: Masada ödenmiş olan aynı ürünler tek satırda birleştirilsin!
  * (Aynı üründen daha önce ödenen ile sonra ödenen aynı siparişte tek satır haline getirilir)
+ * Yalnızca durumu, birim fiyatı ve QR isteği aynı olan satırlar birleşir: ikram/iade/iptal kalemleri
+ * satışa dönüşmez (raporlar bozulmaz), fiyatı değişmiş ürün yanlış birim fiyatla görünmez,
+ * QR müşterisi kendi siparişinin durumunu görmeye devam eder.
  */
 export const mergePaidOrderItems = async (connectionOrPool, orderId = null) => {
   const query = `
-    SELECT order_id, product_id, COUNT(*) as cnt, MIN(id) as keep_id, 
+    SELECT order_id, product_id, unit_price, item_status, qr_request_id,
+           COUNT(*) as cnt, MIN(id) as keep_id,
            SUM(quantity) as total_qty, SUM(total_price) as total_sum,
            GROUP_CONCAT(DISTINCT NULLIF(TRIM(note), '') SEPARATOR ', ') as combined_notes
     FROM order_items
     WHERE is_paid = 1 ${orderId ? 'AND order_id = ?' : ''}
-    GROUP BY order_id, product_id
+    GROUP BY order_id, product_id, unit_price, item_status, qr_request_id
     HAVING cnt > 1
   `;
   const [duplicatePaid] = await connectionOrPool.query(query, orderId ? [orderId] : []);
 
   for (const dup of duplicatePaid) {
     await connectionOrPool.query(
-      'UPDATE order_items SET quantity = ?, total_price = ?, item_status = "delivered", note = ? WHERE id = ?',
+      'UPDATE order_items SET quantity = ?, total_price = ?, note = ? WHERE id = ?',
       [dup.total_qty, dup.total_sum, dup.combined_notes || null, dup.keep_id]
     );
     await connectionOrPool.query(
-      'DELETE FROM order_items WHERE order_id = ? AND product_id = ? AND is_paid = 1 AND id != ?',
-      [dup.order_id, dup.product_id, dup.keep_id]
+      `DELETE FROM order_items
+       WHERE order_id = ? AND product_id = ? AND is_paid = 1 AND unit_price = ? AND item_status = ?
+         AND (qr_request_id <=> ?) AND id != ?`,
+      [dup.order_id, dup.product_id, dup.unit_price, dup.item_status, dup.qr_request_id, dup.keep_id]
     );
   }
 };
 
 /**
+ * Siparişin kalan (ödenmemiş) borcunu hesaplayıp orders.total_price'a yazar.
+ * Kalan = Faturalanabilir tüm kalemler (ödenmiş dahil; İptal, İade, İkram hariç)
+ *         - Daha önce masadan düşülen tutar (Tahsilat - Bahşiş + İndirim)
+ * Böylece kalem bazlı ve tutar bazlı kısmi ödemeler aynı formülle hesaba katılır.
+ */
+export const recalcOrderTotal = async (connectionOrPool, orderId) => {
+  const [[itemsRow]] = await connectionOrPool.query(
+    `SELECT COALESCE(SUM(total_price), 0.00) as items_sum FROM order_items
+     WHERE order_id = ? AND item_status NOT IN ('cancelled', 'returned', 'complimentary')`,
+    [orderId]
+  );
+  const [[paidRow]] = await connectionOrPool.query(
+    `SELECT COALESCE(SUM(total_amount - tip + discount), 0.00) as settled FROM payments WHERE order_id = ?`,
+    [orderId]
+  );
+  const remaining = Math.max(0, parseFloat(itemsRow.items_sum) - parseFloat(paidRow.settled));
+  const newTotal = Math.round(remaining * 100) / 100;
+
+  await connectionOrPool.query('UPDATE orders SET total_price = ? WHERE id = ?', [newTotal, orderId]);
+  return newTotal;
+};
+
+/**
  * Belirli bir masanın aktif sipariş ve adisyon detaylarını getir
  */
+/**
+ * Kalem adedi değişikliği / kalemin masadan kaldırılması için denetim izi kaydı
+ * change: { action, verb, qty } — qty: değişen adet (azalışta negatif)
+ */
+const logItemChange = async (req, item, tableId, change) => {
+  const user = getUserFromReq(req);
+  const [[prod]] = await pool.query('SELECT name FROM products WHERE id = ?', [item.product_id]);
+  const [[table]] = await pool.query('SELECT title FROM restaurant_tables WHERE id = ?', [tableId]);
+  const productName = prod?.name || 'Ürün';
+  const tableTitle = table?.title || `Masa ${tableId}`;
+  const amount = Math.abs(change.qty) * parseFloat(item.unit_price);
+  await logActivity({
+    userId: user.id,
+    userName: user.name,
+    entityType: 'order_item',
+    entityId: item.id,
+    actionType: change.action,
+    title: `${change.verb}: ${productName} (${tableTitle})`,
+    details: `${user.name} tarafından mutfağa geçmeden önce değiştirildi. Tutar farkı: ${change.qty < 0 ? '−' : '+'}₺${amount.toFixed(2)}`,
+    amount,
+    quantity: Math.abs(change.qty),
+    tableTitle
+  });
+};
+
 export const getTableOrder = async (req, res) => {
   try {
     const { tableId } = req.params;
@@ -70,8 +130,8 @@ export const getTableOrder = async (req, res) => {
 
     const order = orderRows[0];
 
-    // 3. Kullanıcının kuralı: Masadaki ödenmiş aynı ürünler tek satırda birleştirilsin
-    await mergePaidOrderItems(pool, order.id);
+    // Not: Ödenmiş aynı ürünlerin birleştirilmesi ödeme işleminin içinde yapılır; okuma isteği veriyi değiştirmez
+    // (aynı masayı iki cihaz aynı anda açtığında çakışma olmasın).
 
     // 4. Siparişe Ait Kalemleri (Ürünleri) Getir (Önce ödenmemişler, sonra ödenmişler)
     const [items] = await pool.query(
@@ -135,6 +195,136 @@ export const getTableOrder = async (req, res) => {
   }
 };
 
+/** İş kuralı hatası (HTTP durum kodu ile) — işlem geri alınır ve mesaj kullanıcıya gösterilir */
+export class OrderError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+
+/**
+ * Masaya ürün ekler (açık adisyon yoksa yeni adisyon açar). Açık bir veritabanı işlemi (transaction) içinde çağrılmalıdır.
+ * Garsonun POS'tan girdiği sipariş ile onaylanan QR siparişi bu ortak yolu kullanır.
+ * Fiyat her zaman veritabanından alınır; adetler doğrulanmış olmalıdır.
+ * @returns {{ orderId, newTotal, tableTitle, totalQty }}
+ */
+export const addItemsToTable = async (connection, { tableId, items, note = null, userId = null, source = 'pos', qrRequestId = null }) => {
+  // 1. Masa kontrolü
+  const [tableRows] = await connection.query(
+    'SELECT id, title, status FROM restaurant_tables WHERE id = ? AND is_active = TRUE FOR UPDATE',
+    [tableId]
+  );
+  if (tableRows.length === 0) throw new OrderError(404, 'Masa bulunamadı.');
+
+  // 2. Masada açık sipariş var mı?
+  const [activeOrders] = await connection.query(
+    `SELECT id, total_price FROM orders
+     WHERE table_id = ? AND status NOT IN ('completed', 'cancelled')
+     ORDER BY id DESC LIMIT 1 FOR UPDATE`,
+    [tableId]
+  );
+
+  let orderId;
+  if (activeOrders.length > 0) {
+    orderId = activeOrders[0].id;
+    if (note && source === 'qr') {
+      // Müşterinin QR notu personelin yazdığı adisyon notunu silmez, sonuna eklenir
+      await connection.query(
+        "UPDATE orders SET note = IF(note IS NULL OR note = '', ?, CONCAT(note, ' | ', ?)) WHERE id = ?",
+        [note, note, orderId]
+      );
+    } else if (note) {
+      await connection.query('UPDATE orders SET note = ? WHERE id = ?', [note, orderId]);
+    }
+  } else {
+    // Yeni sipariş oluştur
+    const [orderResult] = await connection.query(
+      `INSERT INTO orders (table_id, status, source, total_price, note, created_by_user_id)
+       VALUES (?, 'approved', ?, 0.00, ?, ?)`,
+      [tableId, source, note || null, userId]
+    );
+    orderId = orderResult.insertId;
+
+    // Benzersiz Sipariş GUID (UUID v4) ata
+    await connection.query('UPDATE orders SET order_number = ? WHERE id = ?', [crypto.randomUUID(), orderId]);
+  }
+
+  // 3. Kalemleri (Ürünleri) Ekle veya Miktarlarını Artır
+  for (const item of items) {
+    const quantity = Number(item.quantity ?? 1);
+    // Fiyat her zaman veritabanından alınır; istemcinin gönderdiği fiyat dikkate alınmaz
+    const [pRows] = await connection.query('SELECT name, price, status FROM products WHERE id = ?', [item.product_id]);
+    if (pRows.length === 0 || Number(pRows[0].status) !== 1) {
+      throw new OrderError(400, pRows.length ? `"${pRows[0].name}" şu an satışta değil.` : 'Siparişteki bir ürün bulunamadı.');
+    }
+    const unitPrice = parseFloat(pRows[0].price) || 0;
+    const itemNote = typeof item.note === 'string' && item.note.trim() ? item.note.trim() : null;
+
+    // Kullanıcının kuralı: SADECE durumu MUTFAKTA ('pending') olan, ÖDENMEMİŞ, aynı fiyatlı ve aynı nota sahip satırları birleştir!
+    // Eğer mevcut satır 'delivered' (teslim edilmiş), hazır veya ödenmişse asla birleştirilmez; yeni satır olarak eklenir!
+    // QR siparişinin kalemleri müşterinin takip edebilmesi için yalnızca aynı QR isteğinin kalemleriyle birleşir.
+    const [existingItems] = await connection.query(
+      `SELECT id, quantity, unit_price FROM order_items
+       WHERE order_id = ? AND product_id = ? AND item_status = 'pending' AND COALESCE(is_paid, 0) = 0 AND unit_price = ?
+         AND (note = ? OR (note IS NULL AND ? IS NULL)) AND (qr_request_id <=> ?)
+       ORDER BY id ASC LIMIT 1`,
+      [orderId, item.product_id, unitPrice, itemNote, itemNote, qrRequestId]
+    );
+
+    if (existingItems.length > 0) {
+      const existingItem = existingItems[0];
+      const newQty = existingItem.quantity + quantity;
+      await connection.query(
+        'UPDATE order_items SET quantity = ?, total_price = ? WHERE id = ?',
+        [newQty, newQty * unitPrice, existingItem.id]
+      );
+    } else {
+      await connection.query(
+        `INSERT INTO order_items (order_id, product_id, quantity, unit_price, total_price, item_status, is_paid, note, created_by_user_id, qr_request_id)
+         VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?)`,
+        [orderId, item.product_id, quantity, unitPrice, quantity * unitPrice, itemNote, userId, qrRequestId]
+      );
+    }
+  }
+
+  // 4. Siparişin kalan borcunu yeniden hesapla
+  const newTotal = await recalcOrderTotal(connection, orderId);
+
+  // 5. Masayı Dolu (Occupied) Durumuna Getir
+  await connection.query("UPDATE restaurant_tables SET status = 'occupied' WHERE id = ?", [tableId]);
+
+  const totalQty = items.reduce((s, it) => s + (parseInt(it.quantity, 10) || 1), 0);
+  return { orderId, newTotal, tableTitle: tableRows[0].title, totalQty };
+};
+
+/**
+ * İşlem sonrası: ödenmiş kalemleri birleştirir, güncel adisyonu getirir ve POS/mutfak ekranlarına canlı bildirim gönderir.
+ */
+export const publishOrderUpdate = async (io, tableId, orderId, newTotal) => {
+  await mergePaidOrderItems(pool, orderId);
+  const [orderRows] = await pool.query('SELECT * FROM orders WHERE id = ?', [orderId]);
+  const [allOrderItems] = await pool.query(
+    `SELECT
+      oi.*,
+      COALESCE(oi.is_paid, 0) AS is_paid,
+      p.name AS product_name,
+      p.image_url,
+      c.name AS category_name
+     FROM order_items oi
+     JOIN products p ON oi.product_id = p.id
+     LEFT JOIN categories c ON p.category_id = c.id
+     WHERE oi.order_id = ?
+     ORDER BY oi.id ASC`,
+    [orderId]
+  );
+
+  const tid = parseInt(tableId, 10);
+  io?.emit('table:updated', { tableId: tid, status: 'occupied', active_total: newTotal });
+  io?.emit('order:created', { orderId, tableId: tid, order: orderRows[0], items: allOrderItems });
+  return { order: orderRows[0], items: allOrderItems };
+};
+
 /**
  * Masaya Yeni Sipariş / Ek Ürünler Ekle (Kaydet / Mutfağa Gönder)
  */
@@ -149,163 +339,46 @@ export const saveTableOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: 'En az bir ürün eklenmelidir.' });
     }
 
-    await connection.beginTransaction();
-
-    // 1. Masa kontrolü
-    const [tableRows] = await connection.query(
-      'SELECT id, title, status FROM restaurant_tables WHERE id = ? AND is_active = TRUE FOR UPDATE',
-      [tableId]
-    );
-
-    if (tableRows.length === 0) {
-      await connection.rollback();
-      return res.status(404).json({ success: false, message: 'Masa bulunamadı.' });
-    }
-
-    // 2. Masada açık sipariş var mı?
-    const [activeOrders] = await connection.query(
-      `SELECT id, total_price FROM orders 
-       WHERE table_id = ? AND status NOT IN ('completed', 'cancelled') 
-       ORDER BY id DESC LIMIT 1 FOR UPDATE`,
-      [tableId]
-    );
-
-    let orderId;
-    if (activeOrders.length > 0) {
-      orderId = activeOrders[0].id;
-      if (note) {
-        await connection.query('UPDATE orders SET note = ? WHERE id = ?', [note, orderId]);
-      }
-    } else {
-      // Yeni sipariş oluştur
-      const [orderResult] = await connection.query(
-        `INSERT INTO orders (table_id, status, source, total_price, note, created_by_user_id) 
-         VALUES (?, 'approved', 'pos', 0.00, ?, ?)`,
-        [tableId, note || null, user.id]
-      );
-      orderId = orderResult.insertId;
-
-      // Benzersiz Sipariş GUID (UUID v4) ata
-      const orderNumber = crypto.randomUUID();
-      await connection.query('UPDATE orders SET order_number = ? WHERE id = ?', [orderNumber, orderId]);
-    }
-
-    // 3. Kalemleri (Ürünleri) Ekle veya Miktarlarını Artır
+    // Adet pozitif tam sayı olmalı (negatif/ondalık adet adisyon toplamını düşürmesin)
     for (const item of items) {
-      const quantity = parseInt(item.quantity, 10) || 1;
-      let unitPrice = parseFloat(item.unit_price) || 0;
-      if (unitPrice <= 0) {
-        const [pRows] = await connection.query('SELECT price FROM products WHERE id = ?', [item.product_id]);
-        if (pRows.length > 0) {
-          unitPrice = parseFloat(pRows[0].price) || 0;
-        }
-      }
-      const itemNote = item.note?.trim() || null;
-
-      // Kullanıcının kuralı: SADECE durumu MUTFAKTA ('pending') olan, ÖDENMEMİŞ ve aynı nota sahip satırları birleştir!
-      // Eğer mevcut satır 'delivered' (teslim edilmiş), hazır veya ödenmişse asla birleştirilmez; yeni satır olarak eklenir!
-      const [existingItems] = await connection.query(
-        `SELECT id, quantity, unit_price FROM order_items 
-         WHERE order_id = ? AND product_id = ? AND item_status = 'pending' AND COALESCE(is_paid, 0) = 0 AND (note = ? OR (note IS NULL AND ? IS NULL))
-         ORDER BY id ASC LIMIT 1`,
-        [orderId, item.product_id, itemNote, itemNote]
-      );
-
-      if (existingItems.length > 0) {
-        const existingItem = existingItems[0];
-        const newQty = existingItem.quantity + quantity;
-        const newTotal = newQty * unitPrice;
-        await connection.query(
-          'UPDATE order_items SET quantity = ?, total_price = ? WHERE id = ?',
-          [newQty, newTotal, existingItem.id]
-        );
-      } else {
-        const totalPrice = quantity * unitPrice;
-        await connection.query(
-          `INSERT INTO order_items (order_id, product_id, quantity, unit_price, total_price, item_status, is_paid, note, created_by_user_id) 
-           VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?)`,
-          [orderId, item.product_id, quantity, unitPrice, totalPrice, itemNote, user.id]
-        );
+      const qty = Number(item.quantity ?? 1);
+      if (!Number.isInteger(qty) || qty < 1 || qty > MAX_ITEM_QTY) {
+        return res.status(400).json({ success: false, message: `Ürün adedi 1 ile ${MAX_ITEM_QTY} arasında bir tam sayı olmalıdır.` });
       }
     }
 
-    // 4. Siparişin Açık / Ödenmemiş Toplamını Yeniden Hesapla (İptal, İade, İkram hariç)
-    const [sumResult] = await connection.query(
-      `SELECT COALESCE(SUM(total_price), 0.00) as new_total FROM order_items 
-       WHERE order_id = ? AND COALESCE(is_paid, 0) = 0 AND item_status NOT IN ('cancelled', 'returned', 'complimentary')`,
-      [orderId]
-    );
-    const newTotal = sumResult[0].new_total;
-
-    await connection.query(
-      'UPDATE orders SET total_price = ? WHERE id = ?',
-      [newTotal, orderId]
-    );
-
-    // 5. Masayı Dolu (Occupied) Durumuna Getir
-    await connection.query(
-      "UPDATE restaurant_tables SET status = 'occupied' WHERE id = ?",
-      [tableId]
-    );
-
+    await connection.beginTransaction();
+    const { orderId, newTotal, tableTitle, totalQty } = await addItemsToTable(connection, {
+      tableId, items, note, userId: user.id, source: 'pos'
+    });
     await connection.commit();
 
     // Denetim İzi Kaydı
-    const totalOrderQty = items.reduce((s, it) => s + (parseInt(it.quantity, 10) || 1), 0);
     await logActivity({
       userId: user.id,
       userName: user.name,
       entityType: 'order',
       entityId: orderId,
       actionType: 'order_created',
-      title: `Sipariş Eklendi: ${tableRows[0]?.title || 'Masa'}`,
-      details: `${user.name} tarafından ${items.length} çeşit (${totalOrderQty} adet) sipariş girildi.`,
-      tableTitle: tableRows[0]?.title,
-      quantity: totalOrderQty
+      title: `Sipariş Eklendi: ${tableTitle || 'Masa'}`,
+      details: `${user.name} tarafından ${items.length} çeşit (${totalQty} adet) sipariş girildi.`,
+      tableTitle,
+      quantity: totalQty
     });
 
-    // Ödenmiş kalemleri birleştir
-    await mergePaidOrderItems(pool, orderId);
-
-    // 6. Güncel Siparişi ve Kalemleri Al
-    const [orderRows] = await pool.query('SELECT * FROM orders WHERE id = ?', [orderId]);
-    const [allOrderItems] = await pool.query(
-      `SELECT 
-        oi.*,
-        COALESCE(oi.is_paid, 0) AS is_paid,
-        p.name AS product_name,
-        p.image_url,
-        c.name AS category_name
-       FROM order_items oi
-       JOIN products p ON oi.product_id = p.id
-       LEFT JOIN categories c ON p.category_id = c.id
-       WHERE oi.order_id = ?
-       ORDER BY oi.id ASC`,
-      [orderId]
-    );
-
-    // 7. Socket.io Bildirimleri Gönder (Gerçek Zamanlı POS & Mutfak Senkronizasyonu)
-    req.io?.emit('table:updated', {
-      tableId: parseInt(tableId, 10),
-      status: 'occupied',
-      active_total: newTotal
-    });
-
-    req.io?.emit('order:created', {
-      orderId,
-      tableId: parseInt(tableId, 10),
-      order: orderRows[0],
-      items: allOrderItems
-    });
+    const { order, items: allOrderItems } = await publishOrderUpdate(req.io, tableId, orderId, newTotal);
 
     res.json({
       success: true,
       message: 'Siparişler başarıyla kaydedildi ve mutfağa iletildi.',
-      order: orderRows[0],
+      order,
       items: allOrderItems
     });
   } catch (error) {
-    await connection.rollback();
+    await connection.rollback().catch(() => {});
+    if (error instanceof OrderError) {
+      return res.status(error.status).json({ success: false, message: error.message });
+    }
     console.error('Sipariş kaydetme hatası:', error);
     res.status(500).json({ success: false, message: 'Sipariş kaydedilemedi: ' + error.message });
   } finally {
@@ -325,7 +398,7 @@ export const updateOrderItem = async (req, res) => {
     await connection.beginTransaction();
 
     const [itemRows] = await connection.query(
-      'SELECT id, order_id, unit_price FROM order_items WHERE id = ? FOR UPDATE',
+      'SELECT id, order_id, product_id, quantity, unit_price, is_paid, item_status FROM order_items WHERE id = ? FOR UPDATE',
       [itemId]
     );
 
@@ -335,7 +408,29 @@ export const updateOrderItem = async (req, res) => {
     }
 
     const item = itemRows[0];
-    const newQty = parseInt(quantity, 10);
+    if (item.is_paid) {
+      await connection.rollback();
+      return res.status(400).json({ success: false, message: 'Ödenmiş bir ürün değiştirilemez.' });
+    }
+
+    // Adet gönderilmediyse (sadece not güncelleniyorsa) mevcut adet korunur
+    const qtyGiven = quantity !== undefined && quantity !== null && quantity !== '';
+    const newQty = qtyGiven ? Number(quantity) : item.quantity;
+    if (!Number.isInteger(newQty) || newQty < 0 || newQty > MAX_ITEM_QTY) {
+      await connection.rollback();
+      return res.status(400).json({ success: false, message: `Ürün adedi 0 ile ${MAX_ITEM_QTY} arasında bir tam sayı olmalıdır.` });
+    }
+
+    // Adet yalnızca mutfakta henüz hazırlanmaya başlanmamış kalemlerde değiştirilebilir.
+    // Hazırlanan/teslim edilen ürünler İptal, İade veya İkram ile düşülür (kayıp raporunda görünsün diye).
+    if (newQty !== item.quantity && item.item_status !== 'pending') {
+      await connection.rollback();
+      return res.status(400).json({ success: false, message: 'Hazırlanmaya başlanmış veya teslim edilmiş ürünün adedi değiştirilemez. İptal, İade veya İkram kullanın.' });
+    }
+    if (newQty === 0 && !can(req.user, 'pos.item_delete')) {
+      await connection.rollback();
+      return deny(res, 'pos.item_delete');
+    }
 
     if (newQty <= 0) {
       // 0 veya daha az ise kalemi sil
@@ -348,36 +443,39 @@ export const updateOrderItem = async (req, res) => {
       );
     }
 
-    // Siparişin toplamını güncelle
-    const [sumResult] = await connection.query(
-      'SELECT COALESCE(SUM(total_price), 0.00) as new_total, COUNT(id) as count FROM order_items WHERE order_id = ?',
+    // Siparişin kalan borcunu yeniden hesapla
+    const newOrderTotal = await recalcOrderTotal(connection, item.order_id);
+
+    // Masa yalnızca siparişte hiç kalem (ödenmiş dahil) kalmadıysa boşaltılır
+    const [countResult] = await connection.query(
+      'SELECT COUNT(id) as count FROM order_items WHERE order_id = ?',
       [item.order_id]
     );
-
-    const newOrderTotal = sumResult[0].new_total;
-    const itemsCount = sumResult[0].count;
-
-    await connection.query(
-      'UPDATE orders SET total_price = ? WHERE id = ?',
-      [newOrderTotal, item.order_id]
-    );
+    const itemsCount = countResult[0].count;
 
     // Eğer hiç kalem kalmadıysa masayı boş yapabiliriz
     const [orderInfo] = await connection.query('SELECT table_id FROM orders WHERE id = ?', [item.order_id]);
     const tableId = orderInfo[0]?.table_id;
 
     if (itemsCount === 0 && tableId) {
-      await connection.query("UPDATE restaurant_tables SET status = 'empty' WHERE id = ?", [tableId]);
-      await connection.query("UPDATE orders SET status = 'cancelled' WHERE id = ?", [item.order_id]);
+      await connection.query("UPDATE restaurant_tables SET status = 'empty', qr_reset_at = NOW() WHERE id = ?", [tableId]);
+      await connection.query("UPDATE orders SET status = 'cancelled', closed_at = NOW() WHERE id = ?", [item.order_id]);
     }
 
     await connection.commit();
+
+    if (newQty !== item.quantity) {
+      await logItemChange(req, item, tableId, newQty === 0
+        ? { action: 'item_removed', verb: 'Masadan Kaldırıldı', qty: -item.quantity }
+        : { action: 'item_quantity_changed', verb: `Adet Değişti (${item.quantity} → ${newQty})`, qty: newQty - item.quantity });
+    }
 
     req.io?.emit('table:updated', {
       tableId,
       status: itemsCount === 0 ? 'empty' : 'occupied',
       active_total: newOrderTotal
     });
+    req.io?.emit('order:updated', { tableId });
 
     res.json({
       success: true,
@@ -404,7 +502,7 @@ export const deleteOrderItem = async (req, res) => {
     await connection.beginTransaction();
 
     const [itemRows] = await connection.query(
-      'SELECT id, order_id, is_paid FROM order_items WHERE id = ? FOR UPDATE',
+      'SELECT id, order_id, product_id, quantity, unit_price, is_paid, item_status FROM order_items WHERE id = ? FOR UPDATE',
       [itemId]
     );
 
@@ -418,23 +516,16 @@ export const deleteOrderItem = async (req, res) => {
       await connection.rollback();
       return res.status(400).json({ success: false, message: 'Ödenmiş bir ürün masadan silinemez.' });
     }
+    // Yalnızca mutfakta henüz hazırlanmaya başlanmamış kalem silinebilir; diğerleri İptal/İade/İkram ile düşülür
+    if (item.item_status !== 'pending') {
+      await connection.rollback();
+      return res.status(400).json({ success: false, message: 'Hazırlanmaya başlanmış veya teslim edilmiş ürün silinemez. İptal, İade veya İkram kullanın.' });
+    }
 
     await connection.query('DELETE FROM order_items WHERE id = ?', [itemId]);
 
-    // Siparişin açık / ödenmemiş toplamını güncelle (İptal, İade, İkram hariç)
-    const [sumResult] = await connection.query(
-      `SELECT COALESCE(SUM(total_price), 0.00) as new_total, COUNT(id) as count FROM order_items 
-       WHERE order_id = ? AND COALESCE(is_paid, 0) = 0 AND item_status NOT IN ('cancelled', 'returned', 'complimentary')`,
-      [item.order_id]
-    );
-
-    const newOrderTotal = sumResult[0].new_total;
-    const unpaidItemsCount = sumResult[0].count;
-
-    await connection.query(
-      'UPDATE orders SET total_price = ? WHERE id = ?',
-      [newOrderTotal, item.order_id]
-    );
+    // Siparişin kalan borcunu yeniden hesapla
+    const newOrderTotal = await recalcOrderTotal(connection, item.order_id);
 
     const [orderInfo] = await connection.query('SELECT table_id FROM orders WHERE id = ?', [item.order_id]);
     const tableId = orderInfo[0]?.table_id;
@@ -447,17 +538,20 @@ export const deleteOrderItem = async (req, res) => {
     const totalCount = allCountResult[0]?.total_count || 0;
 
     if (totalCount === 0 && tableId) {
-      await connection.query("UPDATE restaurant_tables SET status = 'empty' WHERE id = ?", [tableId]);
-      await connection.query("UPDATE orders SET status = 'cancelled' WHERE id = ?", [item.order_id]);
+      await connection.query("UPDATE restaurant_tables SET status = 'empty', qr_reset_at = NOW() WHERE id = ?", [tableId]);
+      await connection.query("UPDATE orders SET status = 'cancelled', closed_at = NOW() WHERE id = ?", [item.order_id]);
     }
 
     await connection.commit();
 
+    await logItemChange(req, item, tableId, { action: 'item_removed', verb: 'Masadan Kaldırıldı', qty: -item.quantity });
+
     req.io?.emit('table:updated', {
       tableId,
-      status: itemsCount === 0 ? 'empty' : 'occupied',
+      status: totalCount === 0 ? 'empty' : 'occupied',
       active_total: newOrderTotal
     });
+    req.io?.emit('order:updated', { tableId });
 
     res.json({
       success: true,
@@ -492,7 +586,6 @@ export const closeTablePayment = async (req, res) => {
       customer_id,
       customer_name,
       notes,
-      closed_by_user_id,
       paid_items 
     } = req.body;
 
@@ -564,13 +657,25 @@ export const closeTablePayment = async (req, res) => {
     if (hasItemSelection) {
       // Kalem bazlı ödeme: Seçilen ürünleri ve adetlerini işle
       for (const pItem of paid_items) {
+        const reqQty = Number(pItem?.quantity ?? 1);
+        if (!Number.isInteger(reqQty) || reqQty < 1) {
+          await connection.rollback();
+          return res.status(400).json({ success: false, message: 'Ödenecek ürün adedi 1 veya daha büyük bir tam sayı olmalıdır.' });
+        }
         const [itemRows] = await connection.query(
-          'SELECT id, order_id, product_id, quantity, unit_price, item_status, note FROM order_items WHERE id = ? AND COALESCE(is_paid, 0) = 0 FOR UPDATE',
+          'SELECT id, order_id, product_id, quantity, unit_price, item_status, note, created_by_user_id, qr_request_id FROM order_items WHERE id = ? AND COALESCE(is_paid, 0) = 0 FOR UPDATE',
           [pItem.id]
         );
         if (itemRows.length > 0) {
           const item = itemRows[0];
-          const payQty = Math.min(item.quantity, parseInt(pItem.quantity, 10) || 1);
+          // Kalem bu masanın açık adisyonuna ait olmalı (başka masanın ürünü ödendi işaretlenemez)
+          if (!orderIds.includes(item.order_id)) {
+            await connection.rollback();
+            return res.status(400).json({ success: false, message: 'Seçilen ürünlerden biri bu masaya ait değil. Lütfen adisyonu yenileyin.' });
+          }
+          // İptal/İade/İkram kalemleri ücretlendirilmez; hesap kapanırken zaten kapatılır
+          if (LOSS_STATUSES.includes(item.item_status)) continue;
+          const payQty = Math.min(item.quantity, reqQty);
           const lineTotal = payQty * parseFloat(item.unit_price);
           computedPaidAmount += lineTotal;
 
@@ -588,9 +693,9 @@ export const closeTablePayment = async (req, res) => {
 
             // Ödenen kısım için is_paid = 1 olan yeni satır aç
             await connection.query(
-              `INSERT INTO order_items (order_id, product_id, quantity, unit_price, total_price, item_status, is_paid, note) 
-               VALUES (?, ?, ?, ?, ?, ?, 1, ?)`,
-              [item.order_id, item.product_id, payQty, item.unit_price, lineTotal, item.item_status, item.note]
+              `INSERT INTO order_items (order_id, product_id, quantity, unit_price, total_price, item_status, is_paid, note, created_by_user_id, qr_request_id)
+               VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+              [item.order_id, item.product_id, payQty, item.unit_price, lineTotal, item.item_status, item.note, item.created_by_user_id, item.qr_request_id]
             );
           }
         }
@@ -607,6 +712,53 @@ export const closeTablePayment = async (req, res) => {
       paidAmount = remainingBefore;
     }
 
+    // Yetki kontrolleri: ödeme türü, kısmi ödeme, veresiye, bahşiş ve indirim (rolün indirim üst sınırı dahil)
+    const denyInTx = async (keys) => {
+      await connection.rollback();
+      return deny(res, keys);
+    };
+    if (paidAmount <= 0) {
+      if (!canAny(req.user, ['pos.close_empty', 'payment.cash_card'])) {
+        return denyInTx(['pos.close_empty', 'payment.cash_card']);
+      }
+    } else {
+      const mixedCashCard = (parseFloat(cash_amount) || 0) + (parseFloat(card_amount) || 0);
+      const usesCashCard = validMethod === 'cash' || validMethod === 'credit_card' || (validMethod === 'mixed' && mixedCashCard > 0);
+      const usesVeresiye = validMethod === 'veresiye' || (validMethod === 'mixed' && veresiyeInputVal > 0);
+      const settledNow = Math.max(0, paidAmount - tipVal + discountVal); // Bu tahsilatla masadan düşen ürün tutarı
+      // Kısmi ödeme: bu tahsilattan sonra masada ödenmemiş tutar kalıyorsa. Tüm ürünler seçilip ödeniyorsa kısmi sayılmaz
+      // (bölerek ödeme yetkisi olmayan kasiyer de "Tümünü Seç" ile hesabı kapatabilsin).
+      const isPartial = settledNow < remainingBefore - 0.05;
+
+      // Fazla tahsilat: masadan düşen tutar kalan borcu aşamaz (kasa raporu şişmesin; bahşiş ayrıca girilir)
+      if (settledNow > remainingBefore + 0.05) {
+        await connection.rollback();
+        return res.status(400).json({
+          success: false,
+          code: 'OVERPAYMENT',
+          message: `Tahsil edilen tutar masanın kalan borcunu aşıyor. Kalan borç: ₺${remainingBefore.toFixed(2)}. Fazlası bahşişse bahşiş alanına girin.`
+        });
+      }
+
+      if (usesCashCard && !can(req.user, 'payment.cash_card')) return denyInTx('payment.cash_card');
+      if ((validMethod === 'mixed' || isPartial) && !can(req.user, 'payment.split')) return denyInTx('payment.split');
+      if (usesVeresiye && !can(req.user, 'payment.veresiye')) return denyInTx('payment.veresiye');
+      if (tipVal > 0 && !can(req.user, 'payment.tip')) return denyInTx('payment.tip');
+      if (discountVal > 0) {
+        if (!can(req.user, 'payment.discount')) return denyInTx('payment.discount');
+        const limit = req.user.role === 'admin' ? null : req.user.max_discount_percent;
+        const maxDiscount = limit === null ? Infinity : Math.round(settledNow * limit) / 100;
+        if (discountVal > maxDiscount + 0.01) {
+          await connection.rollback();
+          return res.status(403).json({
+            success: false,
+            code: 'DISCOUNT_LIMIT',
+            message: `İndirim sınırınızı aşıyor: rolünüz en fazla %${limit} (₺${maxDiscount.toFixed(2)}) indirim yapabilir.`
+          });
+        }
+      }
+    }
+
     if (paidAmount <= 0) {
       // Masada gerçekten ödenecek bakiye kalmamışsa (örneğin tüm ürünler ikram/iade ise), masayı doğrudan kapatmaya izin ver!
       if (remainingBefore <= 0.05) {
@@ -619,19 +771,18 @@ export const closeTablePayment = async (req, res) => {
         }
 
         await connection.query(
-          `UPDATE orders SET total_price = 0.00, status = 'completed' WHERE id IN (${orderIds.map(() => '?').join(',')})`,
+          `UPDATE orders SET total_price = 0.00, status = 'completed', closed_at = NOW() WHERE id IN (${orderIds.map(() => '?').join(',')})`,
           orderIds
         );
 
         await connection.query(
-          "UPDATE restaurant_tables SET status = 'empty' WHERE id = ?",
+          "UPDATE restaurant_tables SET status = 'empty', qr_reset_at = NOW() WHERE id = ?",
           [tableId]
         );
 
         await connection.commit();
 
         if (req.io) {
-          req.io.emit('table_updated', { id: parseInt(tableId), status: 'empty' });
           req.io.emit('table:updated', { tableId: parseInt(tableId), active_total: 0.00, status: 'empty' });
           req.io.emit('order:completed', { tableId: parseInt(tableId), orderIds });
         }
@@ -670,9 +821,18 @@ export const closeTablePayment = async (req, res) => {
       if (cashPortion === 0 && cardPortion === 0 && veresiyePortion === 0) {
         cashPortion = paidAmount;
       }
+      // Parçalar negatif olamaz ve toplamı tahsil edilen tutara eşit olmalı (kasa raporu bozulmasın)
+      if (cashPortion < 0 || cardPortion < 0 || veresiyePortion < 0 ||
+          Math.abs(cashPortion + cardPortion + veresiyePortion - paidAmount) > 0.01) {
+        await connection.rollback();
+        return res.status(400).json({
+          success: false,
+          message: `Parçalı ödemede nakit, kart ve veresiye toplamı tahsil edilen tutara (₺${paidAmount.toFixed(2)}) eşit olmalıdır.`
+        });
+      }
     }
 
-    const closedUserId = closed_by_user_id || user.id;
+    const closedUserId = user.id;
 
     // 4. Müşteri (Cari) Bilgisini Çözümle
     let resolvedCustomerId = customer_id ? parseInt(customer_id, 10) : null;
@@ -757,12 +917,12 @@ export const closeTablePayment = async (req, res) => {
 
       // Siparişi completed yap ve masayı boşalt
       await connection.query(
-        `UPDATE orders SET total_price = ?, status = 'completed' WHERE id IN (${orderIds.map(() => '?').join(',')})`,
+        `UPDATE orders SET total_price = ?, status = 'completed', closed_at = NOW() WHERE id IN (${orderIds.map(() => '?').join(',')})`,
         [orderItemsTotal, ...orderIds]
       );
 
       await connection.query(
-        "UPDATE restaurant_tables SET status = 'empty' WHERE id = ?",
+        "UPDATE restaurant_tables SET status = 'empty', qr_reset_at = NOW() WHERE id = ?",
         [tableId]
       );
     } else {
@@ -870,11 +1030,25 @@ export const updateOrderItemStatus = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Geçersiz ürün durumu.' });
     }
 
+    // Hedef duruma göre gereken yetki: servis/mutfak durumları, iptal, iade ve ikram ayrı yetkilerdir
+    const STATUS_PERMISSIONS = {
+      pending: ['kitchen.update', 'pos.deliver'],
+      preparing: ['kitchen.update', 'pos.deliver'],
+      ready: ['kitchen.update', 'pos.deliver'],
+      delivered: ['kitchen.update', 'pos.deliver'],
+      cancelled: ['pos.cancel'],
+      returned: ['pos.return'],
+      complimentary: ['pos.treat']
+    };
+    if (!canAny(req.user, STATUS_PERMISSIONS[status])) {
+      return deny(res, STATUS_PERMISSIONS[status]);
+    }
+
     await connection.beginTransaction();
 
     // 1. Güncellenecek kalemi al
     const [targetRows] = await connection.query(
-      'SELECT id, order_id, product_id, quantity, unit_price, item_status, is_paid, note, created_by_user_id FROM order_items WHERE id = ? FOR UPDATE',
+      'SELECT id, order_id, product_id, quantity, unit_price, item_status, is_paid, note, created_by_user_id, qr_request_id FROM order_items WHERE id = ? FOR UPDATE',
       [itemId]
     );
 
@@ -888,9 +1062,20 @@ export const updateOrderItemStatus = async (req, res) => {
       await connection.rollback();
       return res.status(400).json({ success: false, message: 'Ödenmiş bir ürünün durumu değiştirilemez.' });
     }
+    // İptal/iade/ikram edilmiş bir ürünü geri almak, o durumu verme yetkisini de ister
+    // (ör. mutfak personeli yöneticinin ikramını tekrar "teslim edildi" yapıp hesaba ekleyemez)
+    if (LOSS_STATUSES.includes(currentItem.item_status) && !canAny(req.user, STATUS_PERMISSIONS[currentItem.item_status])) {
+      await connection.rollback();
+      return deny(res, STATUS_PERMISSIONS[currentItem.item_status]);
+    }
 
     const currentQty = parseInt(currentItem.quantity, 10);
-    const splitQty = quantity ? Math.min(parseInt(quantity, 10), currentQty) : currentQty;
+    const qtyGiven = quantity !== undefined && quantity !== null && quantity !== '';
+    if (qtyGiven && (!Number.isInteger(Number(quantity)) || Number(quantity) < 1)) {
+      await connection.rollback();
+      return res.status(400).json({ success: false, message: 'Adet 1 veya daha büyük bir tam sayı olmalıdır.' });
+    }
+    const splitQty = qtyGiven ? Math.min(Number(quantity), currentQty) : currentQty;
 
     let targetItemId = itemId;
 
@@ -906,14 +1091,14 @@ export const updateOrderItemStatus = async (req, res) => {
       // Yeni durum için yeni satır ekle
       const newTotal = splitQty * parseFloat(currentItem.unit_price);
       const [insertRes] = await connection.query(
-        `INSERT INTO order_items (order_id, product_id, quantity, unit_price, total_price, item_status, is_paid, note, created_by_user_id, status_updated_by_user_id)
-         VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
-        [currentItem.order_id, currentItem.product_id, splitQty, currentItem.unit_price, newTotal, status, currentItem.note, currentItem.created_by_user_id, user.id]
+        `INSERT INTO order_items (order_id, product_id, quantity, unit_price, total_price, item_status, is_paid, note, created_by_user_id, status_updated_by_user_id, qr_request_id, status_updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, NOW())`,
+        [currentItem.order_id, currentItem.product_id, splitQty, currentItem.unit_price, newTotal, status, currentItem.note, currentItem.created_by_user_id, user.id, currentItem.qr_request_id]
       );
       targetItemId = insertRes.insertId;
     } else {
       // Tüm adedin durumu güncelleniyor
-      await connection.query('UPDATE order_items SET item_status = ?, status_updated_by_user_id = ? WHERE id = ?', [status, user.id, itemId]);
+      await connection.query('UPDATE order_items SET item_status = ?, status_updated_by_user_id = ?, status_updated_at = NOW() WHERE id = ?', [status, user.id, itemId]);
     }
 
     // 3. Durumu aynı olan, aynı ürün, aynı is_paid (ödenmemiş) ve aynı nota sahip başka bir satır var mı kontrol et (birleştir)
@@ -924,6 +1109,7 @@ export const updateOrderItemStatus = async (req, res) => {
          AND item_status = ? 
          AND COALESCE(is_paid, 0) = 0 
          AND (note <=> ?)
+         AND (qr_request_id <=> ?)
          AND id != ?
        ORDER BY id ASC LIMIT 1 FOR UPDATE`,
       [
@@ -931,6 +1117,7 @@ export const updateOrderItemStatus = async (req, res) => {
         currentItem.product_id,
         status,
         currentItem.note,
+        currentItem.qr_request_id,
         targetItemId
       ]
     );
@@ -944,7 +1131,7 @@ export const updateOrderItemStatus = async (req, res) => {
       const mergedTotal = mergedQty * parseFloat(currentItem.unit_price);
 
       await connection.query(
-        'UPDATE order_items SET quantity = ?, total_price = ?, status_updated_by_user_id = ? WHERE id = ?',
+        'UPDATE order_items SET quantity = ?, total_price = ?, status_updated_by_user_id = ?, status_updated_at = NOW() WHERE id = ?',
         [mergedQty, mergedTotal, user.id, existingMatch.id]
       );
 
@@ -954,18 +1141,8 @@ export const updateOrderItemStatus = async (req, res) => {
       targetKeepId = existingMatch.id;
     }
 
-    // 4. Siparişin toplam açık borcunu yeniden hesapla (cancelled, returned, complimentary hariç)
-    const [sumResult] = await connection.query(
-      `SELECT COALESCE(SUM(total_price), 0.00) as new_total, COUNT(id) as count 
-       FROM order_items 
-       WHERE order_id = ? 
-         AND COALESCE(is_paid, 0) = 0 
-         AND item_status NOT IN ('cancelled', 'returned', 'complimentary')`,
-      [currentItem.order_id]
-    );
-
-    const newOrderTotal = sumResult[0].new_total;
-    await connection.query('UPDATE orders SET total_price = ? WHERE id = ?', [newOrderTotal, currentItem.order_id]);
+    // 4. Siparişin kalan borcunu yeniden hesapla (İptal, İade, İkram hariç)
+    const newOrderTotal = await recalcOrderTotal(connection, currentItem.order_id);
 
     // 5. Siparişin bağlı olduğu masayı bul
     const [orderInfo] = await connection.query('SELECT table_id FROM orders WHERE id = ?', [currentItem.order_id]);
@@ -996,11 +1173,11 @@ export const updateOrderItemStatus = async (req, res) => {
 
         if (allCancelledOrReturned) {
           await connection.query(
-            "UPDATE orders SET status = 'cancelled', total_price = 0.00 WHERE table_id = ? AND status NOT IN ('completed', 'cancelled')",
+            "UPDATE orders SET status = 'cancelled', total_price = 0.00, closed_at = NOW() WHERE table_id = ? AND status NOT IN ('completed', 'cancelled')",
             [tableId]
           );
           await connection.query(
-            "UPDATE restaurant_tables SET status = 'empty' WHERE id = ?",
+            "UPDATE restaurant_tables SET status = 'empty', qr_reset_at = NOW() WHERE id = ?",
             [tableId]
           );
           tableEmptied = true;
@@ -1062,7 +1239,6 @@ export const updateOrderItemStatus = async (req, res) => {
 
     if (tableId) {
       if (tableEmptied) {
-        req.io?.emit('table_updated', { id: parseInt(tableId, 10), status: 'empty' });
         req.io?.emit('table:updated', { tableId: parseInt(tableId, 10), active_total: 0.00, status: 'empty' });
       } else {
         req.io?.emit('table:updated', {
@@ -1088,6 +1264,133 @@ export const updateOrderItemStatus = async (req, res) => {
     await connection.rollback();
     console.error('Ürün durumu güncelleme hatası:', error);
     res.status(500).json({ success: false, message: 'Durum güncellenemedi: ' + error.message });
+  } finally {
+    connection.release();
+  }
+};
+
+/**
+ * Masa Taşıma / Birleştirme
+ * - Hedef masa boşsa: açık adisyon (kalemler, kısmi tahsilatlar, not) olduğu gibi hedef masaya taşınır.
+ * - Hedef masa doluysa: kaynak masanın kalemleri ve tahsilatları hedef masanın açık adisyonuna birleştirilir.
+ * Body: { target_table_id }
+ */
+export const transferTable = async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    const user = getUserFromReq(req);
+    const sourceId = parseInt(req.params.tableId, 10);
+    const targetId = parseInt(req.body.target_table_id, 10);
+
+    if (!targetId || targetId === sourceId) {
+      return res.status(400).json({ success: false, message: 'Lütfen farklı bir hedef masa seçin.' });
+    }
+
+    await connection.beginTransaction();
+
+    // İki masayı da kilitle (aynı anda yapılan sipariş/ödeme ile çakışmasın)
+    const [tables] = await connection.query(
+      'SELECT id, title FROM restaurant_tables WHERE id IN (?, ?) AND is_active = TRUE FOR UPDATE',
+      [sourceId, targetId]
+    );
+    const source = tables.find(t => t.id === sourceId);
+    const target = tables.find(t => t.id === targetId);
+    if (!source || !target) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, message: 'Kaynak veya hedef masa bulunamadı.' });
+    }
+
+    const openOrdersOf = async (tableId) => {
+      const [rows] = await connection.query(
+        `SELECT id, note FROM orders WHERE table_id = ? AND status NOT IN ('completed', 'cancelled') ORDER BY id DESC FOR UPDATE`,
+        [tableId]
+      );
+      return rows;
+    };
+    const sourceOrders = await openOrdersOf(sourceId);
+    if (sourceOrders.length === 0) {
+      await connection.rollback();
+      return res.status(400).json({ success: false, message: `${source.title}: taşınacak açık adisyon yok.` });
+    }
+    const sourceOrderIds = sourceOrders.map(o => o.id);
+    const targetOrders = await openOrdersOf(targetId);
+    const isMerge = targetOrders.length > 0;
+    let targetOrderId;
+
+    if (!isMerge) {
+      // Boş masaya taşıma: adisyonu ve tahsilatlarını hedef masaya bağla
+      await connection.query('UPDATE orders SET table_id = ? WHERE id IN (?)', [targetId, sourceOrderIds]);
+      await connection.query('UPDATE payments SET table_id = ? WHERE order_id IN (?)', [targetId, sourceOrderIds]);
+      targetOrderId = sourceOrderIds[0];
+    } else {
+      // Dolu masaya birleştirme: kalemleri ve tahsilatları hedefin ana adisyonuna aktar
+      targetOrderId = targetOrders[0].id;
+      await connection.query('UPDATE order_items SET order_id = ? WHERE order_id IN (?)', [targetOrderId, sourceOrderIds]);
+      await connection.query('UPDATE payments SET order_id = ?, table_id = ? WHERE order_id IN (?)', [targetOrderId, targetId, sourceOrderIds]);
+
+      // Sipariş notlarını birleştir
+      const notes = [targetOrders[0].note, ...sourceOrders.map(o => o.note)].filter(n => n && n.trim());
+      if (notes.length > 0) {
+        await connection.query('UPDATE orders SET note = ? WHERE id = ?', [[...new Set(notes)].join(' | '), targetOrderId]);
+      }
+
+      // Boşalan kaynak adisyonlar kapatılır (kalemleri ve tahsilatları artık hedef adisyonda)
+      await connection.query(
+        `UPDATE orders SET status = 'cancelled', total_price = 0.00, closed_at = NOW(), note = ? WHERE id IN (?)`,
+        [`Birleştirildi → ${target.title}`, sourceOrderIds]
+      );
+      await mergePaidOrderItems(connection, targetOrderId);
+    }
+
+    // Bu grubun QR siparişleri de masayla birlikte taşınır: bekleyenler onaylanınca yeni masaya düşer,
+    // müşteriler yeni masanın QR'ında siparişlerini görmeye devam eder
+    await connection.query(
+      `UPDATE qr_order_requests SET table_id = ?
+       WHERE table_id = ?
+         AND (status = 'pending' OR order_id IN (?)
+              OR created_at > COALESCE((SELECT qr_reset_at FROM restaurant_tables WHERE id = ?), '1970-01-02'))`,
+      [targetId, sourceId, sourceOrderIds, sourceId]
+    );
+
+    const newTotal = await recalcOrderTotal(connection, targetOrderId);
+    await connection.query("UPDATE restaurant_tables SET status = 'empty', qr_reset_at = NOW() WHERE id = ?", [sourceId]);
+    await connection.query("UPDATE restaurant_tables SET status = 'occupied' WHERE id = ?", [targetId]);
+
+    await connection.commit();
+
+    await logActivity({
+      userId: user.id,
+      userName: user.name,
+      entityType: 'order',
+      entityId: targetOrderId,
+      actionType: isMerge ? 'table_merged' : 'table_transferred',
+      title: isMerge
+        ? `Masalar Birleştirildi: ${source.title} → ${target.title}`
+        : `Masa Taşındı: ${source.title} → ${target.title}`,
+      details: `${user.name} tarafından adisyon ${isMerge ? 'birleştirildi' : 'taşındı'}: ${source.title} → ${target.title}. Güncel kalan tutar: ₺${newTotal.toFixed(2)}`,
+      amount: newTotal,
+      tableTitle: target.title
+    });
+
+    // Her iki masayı ve mutfak ekranını anında güncelle
+    req.io?.emit('table:updated', { tableId: sourceId, status: 'empty', active_total: 0.00 });
+    req.io?.emit('table:updated', { tableId: targetId, status: 'occupied', active_total: newTotal });
+    req.io?.emit('order:updated', { tableId: sourceId });
+    req.io?.emit('order:updated', { tableId: targetId });
+
+    res.json({
+      success: true,
+      merged: isMerge,
+      message: isMerge
+        ? `Adisyonlar birleştirildi: ${source.title} → ${target.title}`
+        : `Adisyon taşındı: ${source.title} → ${target.title}`,
+      target_table: { id: target.id, title: target.title },
+      remaining_total: newTotal
+    });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Masa taşıma hatası:', error);
+    res.status(500).json({ success: false, message: 'Masa taşınamadı: ' + error.message });
   } finally {
     connection.release();
   }
@@ -1130,7 +1433,7 @@ export const getKitchenOrders = async (req, res) => {
       WHERE o.status NOT IN ('completed', 'cancelled')
         AND (
           oi.item_status IN ('pending', 'preparing', 'ready')
-          OR (oi.item_status = 'delivered' AND oi.created_at >= NOW() - INTERVAL 1 HOUR)
+          OR (oi.item_status = 'delivered' AND COALESCE(oi.status_updated_at, oi.created_at) >= NOW() - INTERVAL 1 HOUR)
         )
       ORDER BY oi.created_at ASC
     `);
@@ -1262,11 +1565,35 @@ export const deliverAllTableItems = async (req, res) => {
       await connection.query(`
         UPDATE order_items oi
         JOIN orders o ON oi.order_id = o.id
-        SET oi.item_status = 'delivered', oi.status_updated_by_user_id = ?
+        SET oi.item_status = 'delivered', oi.status_updated_by_user_id = ?, oi.status_updated_at = NOW()
         WHERE o.table_id = ? 
           AND o.status NOT IN ('completed', 'cancelled')
           AND oi.item_status IN ('pending', 'preparing', 'ready')
       `, [user.id, tableId]);
+
+      // Tek tek teslimde olduğu gibi: aynı ürün, fiyat, not ve QR isteğine sahip ödenmemiş teslim edilmiş satırlar birleşir
+      const [dupGroups] = await connection.query(`
+        SELECT oi.order_id, oi.product_id, oi.unit_price, oi.note, oi.qr_request_id,
+               MIN(oi.id) AS keep_id, SUM(oi.quantity) AS total_qty, SUM(oi.total_price) AS total_sum
+        FROM order_items oi
+        JOIN orders o ON oi.order_id = o.id
+        WHERE o.table_id = ? AND o.status NOT IN ('completed', 'cancelled')
+          AND oi.item_status = 'delivered' AND COALESCE(oi.is_paid, 0) = 0
+        GROUP BY oi.order_id, oi.product_id, oi.unit_price, oi.note, oi.qr_request_id
+        HAVING COUNT(*) > 1
+      `, [tableId]);
+      for (const g of dupGroups) {
+        await connection.query(
+          'UPDATE order_items SET quantity = ?, total_price = ? WHERE id = ?',
+          [g.total_qty, g.total_sum, g.keep_id]
+        );
+        await connection.query(
+          `DELETE FROM order_items
+           WHERE order_id = ? AND product_id = ? AND unit_price = ? AND (note <=> ?) AND (qr_request_id <=> ?)
+             AND item_status = 'delivered' AND COALESCE(is_paid, 0) = 0 AND id != ?`,
+          [g.order_id, g.product_id, g.unit_price, g.note, g.qr_request_id, g.keep_id]
+        );
+      }
 
       // Denetim İzi Kaydı
       const [tableRows] = await connection.query('SELECT title FROM restaurant_tables WHERE id = ?', [tableId]);

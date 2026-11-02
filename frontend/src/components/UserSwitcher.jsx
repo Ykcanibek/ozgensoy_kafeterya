@@ -14,8 +14,10 @@ import {
   X,
   Eye,
   EyeOff,
-  UserCheck
+  UserCheck,
+  KeyRound
 } from 'lucide-react';
+import ChangePasswordModal from './ChangePasswordModal';
 
 export default function UserSwitcher() {
   const { user, login } = useAuth();
@@ -28,11 +30,13 @@ export default function UserSwitcher() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
+  const [showChangePassword, setShowChangePassword] = useState(false);
+
   const dropdownRef = useRef(null);
 
-  // Kullanıcı listesini çek
+  // Kullanıcı listesi yalnızca menü açıldığında çekilir (her açılışta güncel liste; sayfa açılışında istek gitmez)
   useEffect(() => {
+    if (!isOpen) return;
     const fetchUsers = async () => {
       try {
         const res = await axios.get('/api/auth/users');
@@ -45,7 +49,7 @@ export default function UserSwitcher() {
     };
 
     fetchUsers();
-  }, [user]);
+  }, [isOpen, user]);
 
   // Dropdown dışına tıklandığında kapat
   useEffect(() => {
@@ -183,7 +187,7 @@ export default function UserSwitcher() {
           fontWeight: '700',
           flexShrink: 0
         }}>
-          {getRoleLabel(user?.role)}
+          {user?.role_name || getRoleLabel(user?.role)}
         </span>
 
         <ChevronDown 
@@ -300,7 +304,7 @@ export default function UserSwitcher() {
                         {u.name}
                       </div>
                       <div style={{ fontSize: '0.74rem', color: '#486b78' }}>
-                        {getRoleLabel(u.role)} • <span style={{ color: '#a38f80' }}>@{u.username}</span>
+                        {u.role_name || getRoleLabel(u.role)} • <span style={{ color: '#a38f80' }}>@{u.username}</span>
                       </div>
                     </div>
                   </div>
@@ -335,8 +339,23 @@ export default function UserSwitcher() {
               );
             })}
           </div>
+
+          {/* Kendi şifresini değiştirme */}
+          <button
+            type="button"
+            onClick={() => { setIsOpen(false); setShowChangePassword(true); }}
+            style={{
+              marginTop: '8px', width: '100%', display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '10px 12px', borderRadius: '12px', border: 'none', borderTop: '1px solid #f2e9e1',
+              background: 'transparent', color: '#346c80', fontWeight: '700', fontSize: '0.84rem', cursor: 'pointer'
+            }}
+          >
+            <KeyRound size={15} /> Şifremi Değiştir
+          </button>
         </div>
       )}
+
+      {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
 
       {/* ======================================================== */}
       {/* ŞIK KULLANICI GEÇİŞ POP-UP (MODAL) EKRANI                 */}
@@ -452,7 +471,7 @@ export default function UserSwitcher() {
                   </span>
                 </div>
                 <span style={{ fontSize: '0.72rem', color: '#486b78' }}>
-                  ({getRoleLabel(user?.role)})
+                  ({user?.role_name || getRoleLabel(user?.role)})
                 </span>
               </div>
 
@@ -485,7 +504,7 @@ export default function UserSwitcher() {
                   {getRoleIcon(targetUser.role, 14)}
                 </div>
                 <span style={{ fontSize: '0.72rem', color: '#486b78' }}>
-                  ({getRoleLabel(targetUser.role)})
+                  ({targetUser.role_name || getRoleLabel(targetUser.role)})
                 </span>
               </div>
             </div>

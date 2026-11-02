@@ -1,0 +1,988 @@
+/* ======================================================== */
+/* POS & MASA EKRANI FULL RESPONSIVE TASARIM SİSTEMİ        */
+/* ======================================================== */
+
+.pos-page-container {
+  min-height: 100vh;
+  min-height: 100dvh;
+  position: relative;
+  z-index: 1;
+  padding: 20px 24px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Üst Bar */
+.pos-header {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 14px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  box-shadow: 0 8px 30px -4px rgba(27, 65, 79, 0.12);
+  border: 1.5px solid #b6ced6;
+  transition: all 0.2s ease;
+}
+
+.pos-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.pos-menu-btn {
+  background: linear-gradient(135deg, #346c80 0%, #265464 100%);
+  border: none;
+  border-radius: 12px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: #ffffff !important;
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: 'Outfit', sans-serif;
+  box-shadow: 0 4px 14px rgba(38, 84, 100, 0.3);
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+}
+
+.pos-menu-btn:hover {
+  background: linear-gradient(135deg, #265464 0%, #1b414f 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(38, 84, 100, 0.4);
+}
+
+.pos-menu-btn svg {
+  color: #ffffff !important;
+}
+
+.pos-header-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #1e292d;
+  margin: 0;
+  letter-spacing: -0.3px;
+  line-height: 1.2;
+}
+
+/* Özgensoy Kafeterya Özel Logo & Marka Tipografisi (Okunaklı, Kalın & Net Geometrik) */
+.cafe-brand-title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: 'Montserrat', 'Plus Jakarta Sans', sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  line-height: 1.15;
+  user-select: none;
+  text-decoration: none;
+}
+
+.cafe-brand-title .brand-ozgensoy {
+  color: #346c80; /* Site ana mavi rengi */
+  font-weight: 800;
+  letter-spacing: -0.2px;
+}
+
+.cafe-brand-title .brand-kafeterya {
+  color: #d93829; /* Canlı kırmızı */
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  font-style: normal;
+}
+
+.pos-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pos-stats-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pos-stat-pill {
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.pos-stat-pill-total {
+  background: #dbe9ee;
+  color: #324f5a;
+  border: 1px solid #b6ced6;
+}
+
+.pos-stat-pill-empty {
+  background: #eef5f0;
+  color: #4d8058;
+  border: 1px solid #cce3d2;
+}
+
+.pos-stat-pill-occupied {
+  background: #fbf0ed;
+  color: #c65742;
+  border: 1px solid #f3c7be;
+}
+
+.pos-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pos-edit-btn {
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+  min-height: 40px;
+}
+
+.pos-logout-btn {
+  background: #ffffff;
+  border: 1px solid #f2cfc7;
+  color: #b84a39;
+  padding: 8px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+  min-height: 40px;
+}
+
+.pos-logout-btn:hover {
+  background: #fdf2f0;
+}
+
+/* Düzenleme Modu Banner */
+.pos-edit-banner {
+  background: linear-gradient(135deg, #fbf6ee 0%, #f5ece0 100%);
+  border-radius: 16px;
+  padding: 12px 20px;
+  border: 1.5px dashed #6293a3;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  animation: fadeIn 0.2s ease;
+}
+
+.pos-edit-banner-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pos-edit-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Masalar Grid ve Kartlar */
+.pos-tables-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 18px;
+}
+
+.pos-table-card {
+  border-radius: 16px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 148px;
+  position: relative;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease, border 0.2s ease, opacity 0.2s ease, background 0.2s ease;
+  box-sizing: border-box;
+}
+
+.pos-card-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+  min-height: 22px;
+}
+
+.pos-card-order-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(98, 147, 163, 0.28);
+  border: 1px solid rgba(61, 119, 140, 0.45);
+  border-radius: 6px;
+  padding: 2px 7px;
+  color: #346c80;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: grab;
+  user-select: none;
+}
+
+.pos-card-center-row {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+  margin: 8px 0;
+}
+
+.pos-table-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.48rem;
+  font-weight: 800;
+  color: #1e292d;
+  margin: 0;
+  line-height: 1.15;
+  letter-spacing: -0.3px;
+}
+
+.pos-table-code {
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.82rem;
+  color: #346c80;
+  background: #dbe9ee;
+  border: 1px solid #b6ced6;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pos-table-status-badge {
+  padding: 3px 9px;
+  border-radius: 8px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pos-card-bottom-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  width: 100%;
+  min-height: 24px;
+}
+
+.pos-card-amount {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 800;
+  margin-left: auto;
+  letter-spacing: -0.3px;
+  line-height: 1;
+}
+
+.pos-card-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.pos-card-btn-edit {
+  background: #dbe9ee;
+  border: 1px solid #6293a3;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: #1b414f;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  touch-action: manipulation;
+  transition: all 0.15s ease;
+}
+
+.pos-card-btn-edit:hover {
+  background: #f0e6d8;
+}
+
+.pos-card-btn-delete {
+  background: #fdf2f0;
+  border: 1px solid #f6cfc7;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: #b84a39;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  touch-action: manipulation;
+  transition: all 0.15s ease;
+}
+
+.pos-card-btn-delete:hover:not(:disabled) {
+  background: #fae4e1;
+}
+
+.pos-card-btn-delete:disabled {
+  background: #fafafa;
+  border-color: #eee;
+  color: #ccc;
+  cursor: not-allowed;
+}
+
+/* Modallar */
+.pos-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(30, 41, 45, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  overscroll-behavior: contain;
+}
+
+.pos-modal-content {
+  background: #ffffff;
+  border-radius: 24px;
+  width: 100%;
+  max-width: 420px;
+  padding: 30px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  border: 1px solid #b6ced6;
+  max-height: 90vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* ======================================================== */
+/* RESPONSIVE MEDIA QUERIES (LAPTOP FERAH, MOBİL 2 MASA)    */
+/* ======================================================== */
+
+/* Masaüstü & Laptop (>= 768px): Geniş, Ferah ve Rahat Tasarım */
+@media (min-width: 768px) {
+  .pos-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 22px;
+    margin-bottom: 22px !important;
+  }
+
+  .pos-header-top-row {
+    display: flex;
+    align-items: center;
+  }
+
+  .pos-header-brand {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .pos-header-title {
+    font-size: 1.35rem !important;
+    font-weight: 800;
+  }
+
+  .pos-user-desktop {
+    display: block !important;
+    margin-top: 0 !important;
+  }
+
+  .pos-user-mobile {
+    display: none !important;
+  }
+
+  .pos-actions-mobile {
+    display: none !important;
+  }
+
+  .pos-header-bottom-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .pos-stats-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pos-stat-pill {
+    padding: 7px 14px !important;
+    font-size: 0.84rem !important;
+    border-radius: 10px !important;
+  }
+
+  .pos-actions-desktop {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pos-actions-desktop .pos-edit-btn {
+    padding: 8px 16px !important;
+    font-size: 0.88rem !important;
+    border-radius: 10px !important;
+  }
+
+  .pos-actions-desktop .pos-logout-btn {
+    padding: 8px 16px !important;
+    font-size: 0.88rem !important;
+    border-radius: 10px !important;
+  }
+
+  /* Tablet & Orta Boy Ekranlarda Ferah Izgara */
+  .pos-tables-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+    gap: 16px !important;
+  }
+
+  .pos-table-card {
+    padding: 16px 18px !important;
+    border-radius: 16px !important;
+    min-height: 150px !important;
+  }
+
+  .pos-table-title {
+    font-size: 1.48rem !important;
+    max-width: none !important;
+  }
+
+  .pos-table-code {
+    font-size: 0.95rem !important;
+  }
+
+  .pos-table-status-badge {
+    padding: 4px 10px !important;
+    border-radius: 8px !important;
+    font-size: 0.78rem !important;
+  }
+
+  .pos-status-text-full {
+    display: inline !important;
+  }
+
+  .pos-status-text-short {
+    display: none !important;
+  }
+
+  .pos-card-amount {
+    font-size: 1.3rem !important;
+  }
+}
+
+/* Laptop & Geniş Monitörler (>= 1200px): 1 Satırda 6 Masa (Kullanıcı İsteği) */
+@media (min-width: 1200px) {
+  .pos-tables-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    gap: 14px !important;
+  }
+
+  .pos-table-card {
+    padding: 14px 16px !important;
+    min-height: 145px !important;
+  }
+
+  .pos-table-title {
+    font-size: 1.42rem !important;
+  }
+
+  .pos-table-code {
+    font-size: 0.92rem !important;
+  }
+
+  .pos-card-amount {
+    font-size: 1.28rem !important;
+  }
+}
+
+/* 32 İnç ve Ekstra Geniş Monitörler (>= 1800px): Tüm Ekranı Kaplayan 6 Masa Düzeni */
+@media (min-width: 1800px) {
+  .pos-page-container {
+    padding: 24px 36px !important;
+  }
+
+  .pos-tables-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    gap: 20px !important;
+  }
+
+  .pos-table-card {
+    padding: 20px 22px !important;
+    min-height: 165px !important;
+  }
+
+  .pos-table-title {
+    font-size: 1.62rem !important;
+  }
+
+  .pos-table-code {
+    font-size: 1.05rem !important;
+  }
+
+  .pos-card-amount {
+    font-size: 1.42rem !important;
+  }
+}
+
+/* Mobil Telefonlar (< 768px): Sade 2 Satırlı Üst Kısım + 1 Satırda 2 Masa (Sıfır Taşma) */
+@media (max-width: 767px) {
+  html, body {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+  }
+
+  .login-page-container {
+    padding: 12px 8px;
+  }
+
+  .login-card {
+    padding: 24px 16px;
+    border-radius: 18px;
+  }
+
+  /* POS Konteyner */
+  .pos-page-container {
+    padding: 8px 6px !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+
+  /* Sade & Kompakt Mobil Header */
+  .pos-header {
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 8px 10px !important;
+    border-radius: 14px !important;
+    margin-bottom: 10px !important;
+    gap: 6px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    box-shadow: 0 2px 10px rgba(27, 65, 79, 0.04);
+  }
+
+  /* Satır 1: Menü & Kafe Başlığı (Sol) + Düzenle & Çıkış İkonları (Sağ) */
+  .pos-header-top-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    gap: 6px !important;
+  }
+
+  .pos-header-brand {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    min-width: 0 !important;
+  }
+
+  .pos-header-title {
+    font-size: 1.05rem !important;
+    margin: 0 !important;
+    line-height: 1.1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .pos-menu-btn {
+    padding: 5px 8px !important;
+    font-size: 0.78rem !important;
+    border-radius: 8px !important;
+    gap: 4px !important;
+  }
+
+  .pos-menu-btn span {
+    display: inline !important;
+  }
+
+  .pos-user-desktop {
+    display: none !important;
+  }
+
+  .pos-actions-desktop {
+    display: none !important;
+  }
+
+  .pos-actions-mobile {
+    display: flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .pos-actions-mobile .pos-edit-btn {
+    padding: 5px 8px !important;
+    font-size: 0.74rem !important;
+    border-radius: 8px !important;
+    min-height: 30px !important;
+    gap: 4px !important;
+  }
+
+  .pos-actions-mobile .pos-logout-btn {
+    padding: 5px 7px !important;
+    border-radius: 8px !important;
+    min-height: 30px !important;
+  }
+
+  /* Satır 2: Kullanıcı Seçici (Sol) + Kompakt Sayaçlar (Sağ) */
+  .pos-header-bottom-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex-wrap: wrap !important;
+    width: 100% !important;
+    gap: 6px !important;
+    border-top: 1px solid #f4ece4 !important;
+    padding-top: 5px !important;
+  }
+
+  /* Kullanıcı seçici sıkıştırılmaz; sayaçlar sığmazsa alt satıra iner (üst üste binmesin) */
+  .pos-user-mobile {
+    display: block !important;
+    flex-shrink: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .pos-stats-group {
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    flex-wrap: wrap !important;
+    flex-shrink: 1 !important;
+    min-width: 0 !important;
+  }
+
+  .pos-stat-pill {
+    padding: 2px 6px !important;
+    font-size: 0.68rem !important;
+    border-radius: 6px !important;
+  }
+
+  /* 1 Satırda Kesinlikle 2 Masa (Mobilde 2 Sütun Izgara) */
+  .pos-tables-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .pos-tables-grid .pos-table-card {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    align-items: stretch !important;
+    padding: 12px 12px !important;
+    border-radius: 14px !important;
+    min-height: 110px !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin-right: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .pos-tables-grid .pos-card-top-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: 100% !important;
+    min-height: 20px !important;
+  }
+
+  .pos-tables-grid .pos-card-center-row {
+    flex: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    gap: 6px !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    margin: 6px 0 !important;
+  }
+
+  .pos-tables-grid .pos-table-title {
+    font-size: 1.25rem !important;
+    font-weight: 800 !important;
+    color: #1e292d !important;
+    max-width: 100% !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    text-align: center !important;
+  }
+
+  .pos-tables-grid .pos-table-code {
+    font-size: 0.82rem !important;
+    font-weight: 600 !important;
+    color: #5d818f !important;
+  }
+
+  .pos-tables-grid .pos-table-status-badge {
+    padding: 3px 8px !important;
+    border-radius: 7px !important;
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+  }
+
+  .pos-status-text-full {
+    display: none !important;
+  }
+
+  .pos-status-text-short {
+    display: inline !important;
+  }
+
+  .pos-tables-grid .pos-card-bottom-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: flex-end !important;
+    width: 100% !important;
+    min-height: 22px !important;
+  }
+
+  .pos-tables-grid .pos-card-amount {
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 1.18rem !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.3px !important;
+    line-height: 1 !important;
+    margin-left: auto !important;
+  }
+
+  .pos-btn-text-full {
+    display: none !important;
+  }
+
+  .pos-btn-text-short {
+    display: inline !important;
+    font-size: 0.74rem !important;
+  }
+
+  .pos-card-btn-edit, .pos-card-btn-delete {
+    padding: 4px 6px !important;
+    min-height: 26px !important;
+    font-size: 0.72rem !important;
+  }
+
+  /* Düzenleme Banner Mobilde */
+  .pos-edit-banner {
+    padding: 8px 10px !important;
+    border-radius: 10px !important;
+    margin-bottom: 10px !important;
+    gap: 8px !important;
+  }
+
+  /* Modallar Mobilde */
+  .pos-modal-overlay {
+    padding: 10px !important;
+  }
+
+  .pos-modal-content {
+    padding: 20px 14px !important;
+    border-radius: 16px !important;
+    max-width: 100% !important;
+  }
+}
+
+/* ======================================================== */
+/* MASA KARTLARI: DURUMA GÖRE TASARIM                       */
+/* Boş: beyaz · Dolu: marka kırmızısı (tam dolgu, beyaz     */
+/* yazı) · Hesap istendi: amber (koyu yazı)                 */
+/* ======================================================== */
+.pos-table-card { cursor: pointer; overflow: hidden; }
+.pos-table-card.is-editing { cursor: grab; }
+
+.pos-table-card.is-empty {
+  background: #ffffff;
+  border: 1.5px solid #b6ced6;
+  box-shadow: 0 8px 24px -4px rgba(27, 65, 79, 0.1), 0 2px 6px rgba(27, 65, 79, 0.05);
+}
+.pos-table-card.is-empty:not(.is-editing):hover {
+  transform: translateY(-2px);
+  border-color: #346c80;
+  box-shadow: 0 12px 28px -6px rgba(27, 65, 79, 0.18);
+}
+
+/* Dolu: kartın tamamı marka kırmızısı tonunda; yazılar beyaz */
+.pos-table-card.is-occupied,
+.pos-table-card.is-bill_requested {
+  --tc-bg-1: #e85a43;
+  --tc-bg-2: #c43a2b;
+  --tc-text: #ffffff;
+  --tc-muted: rgba(255, 255, 255, 0.82);
+  --tc-chip-bg: rgba(255, 255, 255, 0.18);
+  --tc-chip-border: rgba(255, 255, 255, 0.35);
+  --tc-pill-bg: #ffffff;
+  --tc-pill-text: #c43a2b;
+  --tc-shadow: rgba(196, 58, 43, 0.45);
+  background: linear-gradient(145deg, var(--tc-bg-1) 0%, var(--tc-bg-2) 100%);
+  border: 1.5px solid transparent;
+  color: var(--tc-text);
+  box-shadow: 0 14px 30px -12px var(--tc-shadow), 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+/* Hesap istendi: amber; okunurluk için koyu kahve yazı */
+.pos-table-card.is-bill_requested {
+  --tc-bg-1: #fbbf3c;
+  --tc-bg-2: #f09a0e;
+  --tc-text: #3b2300;
+  --tc-muted: rgba(59, 35, 0, 0.75);
+  --tc-chip-bg: rgba(255, 255, 255, 0.35);
+  --tc-chip-border: rgba(59, 35, 0, 0.2);
+  --tc-pill-bg: #3b2300;
+  --tc-pill-text: #ffd27a;
+  --tc-shadow: rgba(240, 154, 14, 0.5);
+}
+/* Hafif ışık parlaması: düz renk sıkıcı durmasın */
+.pos-table-card.is-occupied::after,
+.pos-table-card.is-bill_requested::after {
+  content: '';
+  position: absolute;
+  width: 160px;
+  height: 160px;
+  right: -60px;
+  top: -70px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 70%);
+  pointer-events: none;
+}
+.pos-table-card.is-occupied:not(.is-editing):hover,
+.pos-table-card.is-bill_requested:not(.is-editing):hover {
+  transform: translateY(-3px);
+  box-shadow: 0 20px 36px -14px var(--tc-shadow), 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* Dolu kartta yazı ve rozetler */
+.pos-table-card.is-occupied .pos-table-title,
+.pos-table-card.is-bill_requested .pos-table-title { color: var(--tc-text); }
+.pos-table-card.is-occupied .pos-table-code,
+.pos-table-card.is-bill_requested .pos-table-code {
+  background: var(--tc-chip-bg);
+  border-color: var(--tc-chip-border);
+  color: var(--tc-text);
+}
+
+/* Durum etiketi: beyaz zemin + nabız gibi atan nokta */
+.pos-card-status-pill {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 8px;
+  border-radius: 999px;
+  background: var(--tc-pill-bg);
+  color: var(--tc-pill-text);
+  font-size: 0.74rem;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 3px 8px -2px rgba(0, 0, 0, 0.2);
+}
+.pos-card-status-dot {
+  position: relative;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+.pos-card-status-dot::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  opacity: 0.6;
+  animation: pos-card-pulse 1.8s ease-out infinite;
+}
+@keyframes pos-card-pulse {
+  0% { transform: scale(0.6); opacity: 0.8; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pos-card-status-dot::after { animation: none; }
+}
+
+/* Açık kalma süresi */
+.pos-card-elapsed {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--tc-chip-bg);
+  border: 1px solid var(--tc-chip-border);
+  color: var(--tc-text);
+  font-size: 0.72rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.pos-card-elapsed.long { background: var(--tc-pill-bg); border-color: var(--tc-pill-bg); color: var(--tc-pill-text); }
+
+/* Tutar (etiketsiz, sağ altta büyük) */
+.pos-table-card.is-occupied .pos-card-amount,
+.pos-table-card.is-bill_requested .pos-card-amount {
+  color: var(--tc-text);
+  font-size: 1.5rem;
+  margin-left: auto;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+/* Telefon: daha küçük ölçüler (mevcut mobil kurallar !important kullandığı için burada da gerekir) */
+@media (max-width: 767px) {
+  .pos-card-elapsed { padding: 2px 6px; font-size: 0.66rem; }
+  .pos-card-status-pill { padding: 3px 8px 3px 6px; font-size: 0.68rem; }
+  .pos-tables-grid .pos-table-card.is-occupied .pos-table-title,
+  .pos-tables-grid .pos-table-card.is-bill_requested .pos-table-title { color: var(--tc-text) !important; }
+  .pos-tables-grid .pos-table-card.is-occupied .pos-table-code,
+  .pos-tables-grid .pos-table-card.is-bill_requested .pos-table-code { color: var(--tc-text) !important; }
+  .pos-tables-grid .pos-table-card.is-occupied .pos-card-amount,
+  .pos-tables-grid .pos-table-card.is-bill_requested .pos-card-amount { font-size: 1.2rem !important; color: var(--tc-text) !important; }
+}

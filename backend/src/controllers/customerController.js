@@ -1,5 +1,6 @@
 import { pool } from '../config/db.js';
 import { getUserFromReq, logActivity } from '../config/auditLogger.js';
+import { can, deny } from '../middleware/auth.js';
 
 /**
  * Baş harfleri Türkçe kurallarına uygun şekilde büyük harfe dönüştürür (Title Case)
@@ -402,7 +403,35 @@ export const createCustomerPayment = async (req, res) => {
       });
     }
 
+    // İndirim, masadaki tahsilatla aynı kurallara tabidir: indirim yetkisi ve rolün indirim üst sınırı.
+    // (Aksi halde borcun tamamı "indirim" girilerek borç silme yetkisi olmadan sıfırlanabilirdi.)
+    if (discountVal > 0) {
+      if (!can(req.user, 'payment.discount')) {
+        await connection.rollback();
+        return deny(res, 'payment.discount');
+      }
+      const limit = req.user.role === 'admin' ? null : req.user.max_discount_percent;
+      const maxDiscount = limit === null ? Infinity : Math.round(settleAmount * limit) / 100;
+      if (discountVal > maxDiscount + 0.01) {
+        await connection.rollback();
+        return res.status(403).json({
+          success: false,
+          code: 'DISCOUNT_LIMIT',
+          message: `İndirim sınırınızı aşıyor: rolünüz en fazla %${limit} (₺${maxDiscount.toFixed(2)}) indirim yapabilir. Borcun tamamını kapatmak için borç silme yetkisi gerekir.`
+        });
+      }
+    }
+
+    if (paidAmount <= 0) {
+      await connection.rollback();
+      return res.status(400).json({ success: false, message: 'Tahsil edilecek tutar 0₺ den büyük olmalıdır.' });
+    }
+
     // Nakit ve Kart Dağılımı (Fiilen tahsil edilecek net tutar üzerinden)
+    if (!['cash', 'credit_card', 'mixed'].includes(payment_method)) {
+      await connection.rollback();
+      return res.status(400).json({ success: false, message: 'Geçersiz ödeme yöntemi.' });
+    }
     let cashPortion = 0;
     let cardPortion = 0;
     if (payment_method === 'cash') {
@@ -414,6 +443,11 @@ export const createCustomerPayment = async (req, res) => {
       cardPortion = parseFloat(card_amount || 0);
       if (cashPortion === 0 && cardPortion === 0) {
         cashPortion = paidAmount;
+      }
+      // Parçalar negatif olamaz ve toplamı tahsil edilen tutara eşit olmalı (kasa raporu bozulmasın)
+      if (cashPortion < 0 || cardPortion < 0 || Math.abs(cashPortion + cardPortion - paidAmount) > 0.01) {
+        await connection.rollback();
+        return res.status(400).json({ success: false, message: `Nakit ve kart tutarlarının toplamı tahsil edilen tutara (₺${paidAmount.toFixed(2)}) eşit olmalıdır.` });
       }
     }
 

@@ -1,0 +1,206 @@
+/* ======================================================== */
+/* 7. MÜŞTERİ YÖNETİMİ & CARİ HESAPLAR (CUSTOMERS MODULE)   */
+/* ======================================================== */
+
+.customers-page-wrap {
+  padding: 24px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  /* Diğer sayfalar gibi tam genişlik: büyük ekranlarda kenarlarda boşluk kalmasın */
+  width: 100%;
+}
+
+.customers-header-card {
+  background: #ffffff;
+  border: 1px solid #b6ced6;
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 4px 16px rgba(30, 41, 45, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.customers-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.customers-title-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.customers-icon-badge {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #cbe0e7 0%, #d5e3e8 100%);
+  border: 1.5px solid #6293a3;
+  color: #346c80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(52, 108, 128, 0.12);
+}
+
+.customers-main-title {
+  margin: 0;
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #1e292d;
+}
+
+.customers-sub-title {
+  margin: 4px 0 0 0;
+  font-size: 0.86rem;
+  color: #486b78;
+}
+
+.customers-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #346c80 0%, #1b414f 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  padding: 11px 20px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(52, 108, 128, 0.25);
+  transition: all 0.2s ease;
+}
+
+.customers-btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(52, 108, 128, 0.35);
+  background: linear-gradient(135deg, #8a5a35 0%, #684124 100%);
+}
+
+.customers-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* İstatistik Kartları */
+.customers-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 14px;
+}
+
+.cust-stat-card {
+  background: #dbe9ee;
+  border: 1px solid #b6ced6;
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.2s ease;
+}
+
+.cust-stat-card:hover {
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(30, 41, 45, 0.06);
+}
+
+.stat-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.stat-total-cust .stat-card-icon {
+  background: #cbe0e7;
+  color: #346c80;
+}
+
+.stat-receivables .stat-card-icon {
+  background: #fdf2f2;
+  color: #b84a39;
+}
+
+.stat-collected .stat-card-icon {
+  background: #eaf6ed;
+  color: #1e7e34;
+}
+
+.stat-total-debt .stat-card-icon {
+  background: #fdf6ec;
+  color: #d97706;
+}
+
+.stat-card-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-card-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #486b78;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.stat-card-val {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #1e292d;
+  line-height: 1.2;
+}
+
+.stat-card-val.text-debt {
+  color: #b84a39;
+}
+
+.stat-card-val.text-paid {
+  color: #1e7e34;
+}
+
+/* POS Veresiye Select Dropdown */
+.pos-veresiye-dropdown {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1.5px solid #b6ced6;
+  border-radius: 10px;
+  background: #ffffff;
+  font-size: 0.88rem;
+  color: #1e292d;
+  outline: none;
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.pos-veresiye-dropdown:focus {
+  border-color: #346c80;
+  box-shadow: 0 0 0 3px rgba(52, 108, 128, 0.12);
+}
+
+@keyframes modalPop {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}

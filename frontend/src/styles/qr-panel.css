@@ -1,0 +1,199 @@
+/* ======================================================== */
+/* PANEL: QR SİPARİŞ ONAYI & MASA QR KODLARI                */
+/* ======================================================== */
+
+
+/* Masalar ekranında onay bekleyen QR siparişleri (panelin lacivert-turkuaz rengiyle) */
+.qr-inbox {
+  margin-bottom: 14px; background: #ffffff; border: 1.5px solid #cfe0e6; border-left: 5px solid #1d4f61;
+  border-radius: 16px; overflow: hidden; color: #14303b;
+  box-shadow: 0 12px 28px -18px rgba(20, 48, 59, 0.55);
+  animation: qr-inbox-in 0.25s ease;
+}
+.qr-inbox > header { display: flex; align-items: center; gap: 12px; padding: 12px 14px 10px; }
+.qr-inbox > header > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.qr-inbox > header strong { font-size: 0.98rem; font-weight: 800; }
+.qr-inbox > header span { font-size: 0.78rem; font-weight: 600; color: #6b8590; }
+.qr-inbox-bell {
+  position: relative; flex: none; width: 38px; height: 38px; border-radius: 12px;
+  display: inline-flex; align-items: center; justify-content: center; background: #1d4f61; color: #ffffff;
+  animation: qr-bell 2.4s ease-in-out infinite; transform-origin: 50% 20%;
+}
+.qr-inbox-bell i {
+  position: absolute; top: -3px; right: -3px; width: 11px; height: 11px; border-radius: 50%;
+  background: #d93829; border: 2px solid #ffffff;
+}
+.qr-inbox-all {
+  flex: none; border: 1.5px solid #cfe0e6; background: #f4f8f9; color: #1d4f61; border-radius: 10px;
+  padding: 7px 12px; font-family: inherit; font-size: 0.8rem; font-weight: 800; cursor: pointer;
+}
+.qr-inbox-list { display: flex; flex-direction: column; border-top: 1px solid #edf3f5; }
+.qr-inbox-item {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 12px;
+  border: 0; border-bottom: 1px solid #edf3f5; background: transparent; padding: 10px 14px;
+  font-family: inherit; text-align: left; cursor: pointer; color: inherit; transition: background 0.15s;
+}
+.qr-inbox-item:last-child { border-bottom: 0; }
+.qr-inbox-item:hover { background: #f4f8f9; }
+.qr-inbox-table {
+  background: #1d4f61; color: #ffffff; border-radius: 8px; padding: 4px 10px;
+  font-size: 0.82rem; font-weight: 800; white-space: nowrap;
+}
+.qr-inbox-items {
+  display: flex; align-items: center; gap: 6px; min-width: 0;
+  font-size: 0.86rem; font-weight: 600; color: #2c4a56;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.qr-inbox-items svg { flex: none; color: #b46a00; }
+.qr-inbox-meta { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; }
+.qr-inbox-meta b { font-family: 'Outfit', sans-serif; font-size: 0.95rem; color: #14303b; }
+.qr-inbox-meta time { font-size: 0.72rem; font-weight: 700; color: #d93829; }
+.qr-inbox-go { color: #8aa3ad; }
+.qr-inbox-more {
+  border: 0; background: #f4f8f9; padding: 9px 14px; font-family: inherit; font-size: 0.8rem; font-weight: 800;
+  color: #1d4f61; cursor: pointer; text-align: center;
+}
+@keyframes qr-inbox-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@keyframes qr-bell { 0%, 70%, 100% { transform: rotate(0); } 75% { transform: rotate(12deg); } 82% { transform: rotate(-10deg); } 89% { transform: rotate(6deg); } }
+
+/* Masa kartı: onay bekleyen QR siparişi olan masa (boş/dolu/hesap durumunun üstüne eklenir) */
+.pos-table-card.has-qr {
+  outline: 3px solid #1d4f61; outline-offset: 2px;
+  animation: qr-card-ring 1.8s ease-in-out infinite;
+}
+@keyframes qr-card-ring { 0%, 100% { outline-color: #1d4f61; } 50% { outline-color: rgba(29, 79, 97, 0.25); } }
+.pos-card-qr-badge {
+  position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 2;
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #1d4f61; color: #ffffff; border-radius: 999px; padding: 4px 11px;
+  font-size: 0.72rem; font-weight: 800; white-space: nowrap;
+  box-shadow: 0 0 0 2px #ffffff, 0 6px 12px -4px rgba(20, 48, 59, 0.5);
+}
+@media (prefers-reduced-motion: reduce) { .qr-inbox-bell, .pos-table-card.has-qr { animation: none; } }
+.pos-card-btn-qr {
+  display: inline-flex; align-items: center; gap: 4px; border: 1px solid #b6ced6; background: #f0f6f8; color: #1d4f61;
+  border-radius: 7px; padding: 4px 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer; font-family: inherit;
+}
+
+/* Sipariş kartları */
+.qr-req-list { display: flex; flex-direction: column; gap: 10px; }
+.qr-req {
+  background: #ffffff; border: 1.5px solid #cfe0e6; border-radius: 14px; padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 8px; color: #14303b;
+}
+.qr-req > header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.qr-req > header strong { font-size: 0.98rem; }
+.qr-req time { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 0.74rem; font-weight: 700; color: #6b8590; }
+.qr-req-tag { display: inline-flex; align-items: center; gap: 4px; background: #e3eff3; color: #1d4f61; border-radius: 999px; padding: 2px 8px; font-size: 0.7rem; font-weight: 800; }
+.qr-req ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.qr-req li { display: flex; justify-content: space-between; gap: 10px; font-size: 0.86rem; font-weight: 600; }
+.qr-req li b { color: #1d4f61; }
+.qr-req li em { display: block; font-style: normal; font-size: 0.74rem; color: #a85a00; font-weight: 700; }
+.qr-req-note { margin: 0; display: flex; gap: 6px; align-items: flex-start; font-size: 0.8rem; font-weight: 700; color: #a85a00; background: #fff8ec; border-radius: 9px; padding: 6px 8px; }
+.qr-req > footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px dashed #e2e8ec; padding-top: 8px; }
+.qr-req > footer strong { font-family: 'Outfit', sans-serif; font-size: 1.1rem; }
+.qr-req-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.qr-req-reject { display: flex; flex-direction: column; gap: 8px; background: #fdf4f4; border-radius: 10px; padding: 10px; }
+.qr-req-reject > span { font-size: 0.78rem; font-weight: 700; color: #7a2e2e; }
+.qr-req-reasons { display: flex; flex-wrap: wrap; gap: 5px; }
+.qr-req-reasons button { border: 1px solid #f0c2c2; background: #ffffff; color: #8a2b2b; border-radius: 999px; padding: 4px 10px; font-size: 0.74rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+.qr-req-reasons button.active { background: #c0262d; border-color: #c0262d; color: #ffffff; }
+.qr-req-reject input { border: 1.5px solid #f0c2c2; border-radius: 9px; padding: 8px 10px; font-family: inherit; font-size: 0.86rem; }
+
+.qr-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  border: 1.5px solid #d8e6eb; background: #ffffff; color: #173845;
+  border-radius: 10px; padding: 8px 12px; font-family: inherit; font-size: 0.84rem; font-weight: 800; cursor: pointer;
+}
+.qr-btn:disabled { opacity: 0.6; cursor: default; }
+.qr-btn.approve { background: #13804a; border-color: #13804a; color: #ffffff; }
+.qr-btn.approve:hover:not(:disabled) { background: #0f6b3d; }
+.qr-btn.reject { color: #c0262d; border-color: #f0c2c2; }
+.qr-btn.reject.solid { background: #c0262d; border-color: #c0262d; color: #ffffff; }
+.qr-icon-btn {
+  width: 34px; height: 34px; border-radius: 10px; border: 1.5px solid #d8e6eb; background: #ffffff; color: #486b78;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex: none;
+}
+
+/* Pencere */
+.qr-modal-backdrop {
+  position: fixed; inset: 0; z-index: 1400; background: rgba(15, 40, 51, 0.45);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.qr-modal {
+  width: min(460px, 100%); max-height: 92vh; background: #ffffff; border-radius: 20px; border: 1.5px solid #b6ced6;
+  box-shadow: 0 24px 60px -20px rgba(15, 23, 42, 0.45); display: flex; flex-direction: column; overflow: hidden; color: #14303b;
+}
+.qr-modal.wide { width: min(620px, 100%); }
+.qr-modal > header { display: flex; justify-content: space-between; gap: 12px; padding: 16px 18px 12px; border-bottom: 1px solid #edf3f5; }
+.qr-modal h3 { margin: 0; font-size: 1.08rem; font-weight: 800; display: flex; align-items: center; gap: 6px; }
+.qr-modal > header p { margin: 3px 0 0; font-size: 0.8rem; color: #6b8590; font-weight: 600; }
+.qr-modal-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; align-items: stretch; }
+.qr-modal-body.scroll { overflow-y: auto; background: #f4f8f9; }
+.qr-modal > footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid #edf3f5; background: #fafcfd; }
+.qr-code-box { align-self: center; width: 240px; height: 240px; border-radius: 16px; border: 1.5px solid #e2ecf0; padding: 10px; display: flex; align-items: center; justify-content: center; color: #6b8590; font-weight: 700; }
+.qr-code-box img { width: 100%; height: 100%; }
+.qr-url { display: flex; align-items: center; gap: 6px; }
+.qr-url code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: #f4f8f9; border-radius: 9px; padding: 8px 10px; font-size: 0.78rem; color: #346c80; }
+.qr-empty { text-align: center; color: #6b8590; font-weight: 700; padding: 20px 0; }
+
+/* Masa penceresi içinde bekleyen QR siparişleri */
+.qr-table-pending { margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
+.qr-table-pending > strong { display: flex; align-items: center; gap: 6px; font-size: 0.88rem; color: #1d4f61; }
+
+@media (max-width: 767px) {
+  .qr-modal-backdrop { padding: 0; align-items: flex-end; }
+  .qr-modal, .qr-modal.wide { width: 100%; border-radius: 18px 18px 0 0; max-height: 94dvh; }
+}
+.pos-center-panel > .qr-table-pending { flex-shrink: 0; max-height: 45%; overflow-y: auto; padding: 10px; border-radius: 14px; background: #f4f8f9; border: 1.5px solid #cfe0e6; }
+
+/* Düzenleme modunda kart düğmeleri (Düzenle / QR / Sil) sığmazsa alt satıra geçsin */
+.pos-card-edit-actions { flex-wrap: wrap; row-gap: 4px; }
+@media (max-width: 767px) {
+  .qr-inbox-item { grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; padding: 10px 12px; }
+  .qr-inbox-go { display: none; }
+  .pos-card-qr-badge { bottom: 6px; font-size: 0.64rem; padding: 3px 8px; }
+}
+
+/* Masalar ekranı dışındaki sayfalarda: onay bekleyen QR sipariş düğmesi (sağ alt köşe) */
+.qr-float {
+  position: fixed; right: 18px; bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 1200;
+  display: flex; align-items: center; gap: 12px; max-width: min(360px, calc(100vw - 36px));
+  border: 1.5px solid #cfe0e6; border-left: 5px solid #1d4f61; border-radius: 16px;
+  background: #ffffff; color: #14303b; padding: 10px 12px 10px 12px; cursor: pointer; text-align: left;
+  font-family: inherit; box-shadow: 0 18px 36px -14px rgba(20, 48, 59, 0.55);
+  animation: qr-inbox-in 0.25s ease;
+}
+.qr-float:hover { background: #f4f8f9; }
+.qr-float-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.qr-float-text strong { font-size: 0.92rem; font-weight: 800; }
+.qr-float-text small { font-size: 0.76rem; font-weight: 600; color: #6b8590; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qr-float > svg { color: #8aa3ad; flex: none; }
+@media (max-width: 767px) {
+  .qr-float { left: 12px; right: 12px; max-width: none; bottom: calc(12px + env(safe-area-inset-bottom)); }
+}
+
+/* Menü adresi (VITE_MENU_URL) ayarlanmamışsa QR penceresindeki uyarı */
+.qr-warning {
+  margin: 0; padding: 10px 12px; border-radius: 10px; background: #fff6e5; border: 1px solid #f3d29a;
+  color: #8a5300; font-size: 0.78rem; font-weight: 600; line-height: 1.5;
+}
+
+/* Masalar başlığında "QR sipariş: Açık / Kapalı" anahtarı (istatistik hapları boyutunda) */
+.qr-ordering-toggle {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px 6px 11px; border-radius: 10px;
+  font-family: inherit; font-size: 0.82rem; font-weight: 600; white-space: nowrap; cursor: pointer;
+  border: 1.5px solid; transition: background 0.15s, border-color 0.15s;
+}
+.qr-ordering-toggle strong { font-weight: 800; }
+.qr-ordering-toggle i { position: relative; width: 28px; height: 16px; border-radius: 999px; background: currentColor; opacity: 0.9; }
+.qr-ordering-toggle i::after {
+  content: ''; position: absolute; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: #ffffff;
+  transition: left 0.15s ease;
+}
+.qr-ordering-toggle.on { background: #e7f3ec; border-color: #9fd0b2; color: #13804a; }
+.qr-ordering-toggle.on i::after { left: 14px; }
+.qr-ordering-toggle.off { background: #fdecea; border-color: #f0b4ad; color: #c0262d; }
+.qr-ordering-toggle.off i::after { left: 2px; }
+.qr-ordering-toggle:disabled { cursor: default; }
+.qr-ordering-toggle:disabled i { display: none; }

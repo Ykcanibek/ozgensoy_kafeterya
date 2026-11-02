@@ -1,0 +1,1095 @@
+/* ======================================================== */
+/* KATEGORİ YÖNETİMİ STILLERİ (CATEGORIES LIST STYLES)     */
+/* ======================================================== */
+
+/* X Ekseninde Ortalanmış Oval Arama Çubuğu */
+.cat-search-centered-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+.cat-search-pill-box {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #ffffff;
+  border: 1.5px solid #b6ced6;
+  border-radius: 9999px;
+  padding: 13px 26px;
+  width: 100%;
+  max-width: 620px;
+  box-shadow: 0 4px 18px rgba(27, 65, 79, 0.06);
+  transition: all 0.2s ease;
+}
+
+.cat-search-pill-box:focus-within {
+  border-color: #346c80;
+  box-shadow: 0 6px 24px rgba(52, 108, 128, 0.12);
+  transform: translateY(-1px);
+}
+
+.cat-search-pill-box input {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 1.02rem;
+  color: #1e292d;
+  width: 100%;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+}
+
+.cat-search-pill-box input::placeholder {
+  color: #5d818f;
+}
+
+.cat-search-clear-btn {
+  background: #cce2e9;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #346c80;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.cat-search-clear-btn:hover {
+  background: #b6ced6;
+  color: #1e292d;
+}
+
+/* Kategori Liste Konteyneri */
+.cat-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+/* Kategori Liste Satırı */
+.cat-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  border: 1px solid #b6ced6;
+  border-radius: 14px;
+  padding: 10px 16px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 6px rgba(27, 65, 79, 0.04);
+  gap: 14px;
+}
+
+.cat-list-row:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 16px rgba(27, 65, 79, 0.08);
+  border-color: #6293a3;
+}
+
+.cat-list-row.is-passive {
+  opacity: 0.74;
+  background: #faf7f4;
+  border-color: #e4d8cc;
+  border-style: dashed;
+}
+
+.cat-list-row.is-dragging {
+  opacity: 0.35 !important;
+  transform: scale(0.99);
+  box-shadow: none;
+}
+
+.cat-list-row.is-drag-over {
+  border-color: #346c80 !important;
+  outline: 2px dashed #346c80;
+  background: #fcf9f5;
+}
+
+/* Sol Taraf: Sürükle + Sıra + Thumbnail + İsim */
+.cat-row-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  flex: 1;
+}
+
+.cat-drag-handle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: grab;
+  color: #486b78;
+  padding: 6px 4px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.cat-drag-handle:active {
+  cursor: grabbing;
+}
+
+.cat-drag-handle:hover {
+  background: #ede2d4;
+  color: #1b414f;
+}
+
+.cat-order-pill {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #346c80;
+}
+
+/* Küçük Görsel Thumbnail */
+.cat-thumb-wrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #d3e5eb;
+  border: 1px solid #b6ced6;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.cat-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cat-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f4ece2 0%, #ebdccf 100%);
+}
+
+/* Kategori Başlık ve Ürün Bilgisi (Seçilebilir ve Kopyalanabilir) */
+.cat-info-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.cat-name-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.cat-row-title {
+  margin: 0;
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #1e292d;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+.cat-passive-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #486b78;
+  background: #eee7de;
+  padding: 2px 7px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.cat-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cat-product-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #324f5a;
+  background: #cce2e9;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.cat-status-dot-active {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #1e7e34;
+}
+
+.cat-green-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #2e8b57;
+}
+
+/* Sağ Taraf: Aksiyon Butonları */
+.cat-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* QR Menü Görünürlük Butonu (Yeşil: Açık, Kırmızı: Kapalı, Gri: Pasif) */
+.cat-qr-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  border-radius: 9px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1.5px solid transparent;
+}
+
+.cat-qr-btn.active {
+  background: #eaf6ed;
+  color: #1e7e34;
+  border-color: #a3d9b0;
+  box-shadow: 0 1px 4px rgba(30, 126, 52, 0.12);
+}
+
+.cat-qr-btn.active:hover {
+  background: #dcf1e2;
+  border-color: #7bc78e;
+  transform: translateY(-1px);
+}
+
+.cat-qr-btn.inactive {
+  background: #fdf2f0;
+  color: #b84a39;
+  border-color: #f6cfc7;
+  box-shadow: 0 1px 4px rgba(184, 74, 57, 0.1);
+}
+
+.cat-qr-btn.inactive:hover {
+  background: #fae3df;
+  border-color: #e59d90;
+  transform: translateY(-1px);
+}
+
+.cat-qr-btn.disabled {
+  background: #d3e5eb;
+  color: #a89280;
+  border-color: #b6ced6;
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+/* iOS Tarzı Hızlı Switch */
+.cat-status-switch-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px;
+}
+
+.cat-status-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  min-width: 34px;
+}
+
+.cat-status-label.active {
+  color: #1e7e34;
+}
+
+.cat-status-label.passive {
+  color: #486b78;
+}
+
+.cat-switch {
+  position: relative;
+  display: inline-block;
+  width: 34px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.cat-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.cat-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: #d1c5ba;
+  transition: .25s ease;
+  border-radius: 20px;
+}
+
+.cat-slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .25s ease;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+}
+
+.cat-switch input:checked + .cat-slider {
+  background-color: #2e8b57;
+}
+
+.cat-switch input:checked + .cat-slider:before {
+  transform: translateX(14px);
+}
+
+/* Düzenle ve Sil Aksiyon Butonları */
+.cat-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 14px;
+  border-radius: 9px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid;
+}
+
+.cat-action-btn.edit {
+  background: #dbe9ee;
+  border-color: #6293a3;
+  color: #1b414f;
+}
+
+.cat-action-btn.edit:hover {
+  background: #cce2e9;
+  border-color: #b59169;
+}
+
+.cat-action-btn.delete {
+  background: #fdf4f2;
+  border-color: #f6cfc7;
+  color: #b84a39;
+}
+
+.cat-action-btn.delete:hover {
+  background: #fae1dc;
+  border-color: #e59d90;
+}
+
+.cat-action-btn.history {
+  background: #f0f4f8;
+  border-color: #bcd0e2;
+  color: #1e5a8a;
+}
+
+.cat-action-btn.history:hover {
+  background: #e2ecf5;
+  border-color: #93b5d3;
+}
+
+.cat-staff-stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.74rem;
+  color: #486b78;
+  background: #dbe9ee;
+  border: 1px solid #b6ced6;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.cat-staff-stamp strong {
+  color: #1b414f;
+  font-weight: 700;
+}
+
+.prod-col-staff {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Denetim İzi & Hareket Zaman Çizelgesi (Audit Timeline) */
+.audit-timeline-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  padding-left: 8px;
+}
+
+.audit-timeline-item {
+  position: relative;
+  padding-left: 28px;
+}
+
+.audit-timeline-line {
+  position: absolute;
+  top: 14px;
+  bottom: -20px;
+  left: 9px;
+  width: 2px;
+  background: #e8ded4;
+}
+
+.audit-timeline-item:last-child .audit-timeline-line {
+  display: none;
+}
+
+.audit-timeline-dot {
+  position: absolute;
+  top: 12px;
+  left: 5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 2px rgba(52, 108, 128, 0.15);
+  z-index: 1;
+}
+
+.audit-timeline-card {
+  background: #ffffff;
+  border: 1px solid #cce2e9;
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 4px rgba(27, 65, 79, 0.04);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.audit-timeline-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(27, 65, 79, 0.08);
+}
+
+.audit-timeline-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.audit-user-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.audit-user-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: #d3e5eb;
+  color: #346c80;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.audit-user-name {
+  font-size: 0.88rem;
+  color: #1e292d;
+  font-weight: 700;
+}
+
+.audit-role-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #f0f4f8;
+  color: #1e5a8a;
+  border: 1px solid #bcd0e2;
+}
+
+.audit-time {
+  font-size: 0.76rem;
+  color: #5d818f;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.audit-timeline-title {
+  margin-bottom: 6px;
+}
+
+.audit-action-tag {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid;
+}
+
+.audit-timeline-details {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #5c4f45;
+  line-height: 1.45;
+  background: #dbe9ee;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border-left: 3px solid #346c80;
+  word-break: break-word;
+}
+
+/* Mobil Cihazlar İçin Liste Uyarlaması (Butonlar alt satırda, isimler tam görünür) */
+@media (max-width: 767px) {
+  .cat-search-pill-box {
+    padding: 10px 18px;
+    max-width: 100%;
+  }
+
+  .cat-list-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 12px 14px !important;
+    gap: 10px !important;
+    border-radius: 14px !important;
+  }
+
+  /* Üst Satır: Sürükleme Tutamacı + Resim + Kategori Adı ve Ürün Sayısı */
+  .cat-row-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    width: 100% !important;
+  }
+
+  .cat-thumb-wrapper {
+    width: 46px !important;
+    height: 46px !important;
+    border-radius: 10px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .cat-info-col {
+    flex: 1 !important;
+    min-width: 0 !important;
+  }
+
+  .cat-name-line {
+    display: flex !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+
+  .cat-row-title {
+    font-size: 1.12rem !important;
+    max-width: none !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    line-height: 1.3 !important;
+  }
+
+  .cat-row-meta {
+    margin-top: 2px !important;
+    gap: 6px !important;
+  }
+
+  /* Alt Satır: İşlem Butonları (Mobilde tek satıra sığması için metinler gizlenir, sadece ikonlar gösterilir) */
+  .cat-row-actions {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex-wrap: nowrap !important;
+    width: 100% !important;
+    border-top: 1px solid #b6ced6 !important;
+    padding-top: 9px !important;
+    gap: 6px !important;
+  }
+
+  .cat-qr-btn {
+    padding: 7px 10px !important;
+    font-size: 0.76rem !important;
+    border-radius: 8px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .cat-qr-btn-text {
+    display: none !important;
+  }
+
+  .cat-status-switch-wrapper {
+    gap: 0 !important;
+    flex-shrink: 0 !important;
+  }
+
+  .cat-status-label {
+    display: none !important;
+  }
+
+  .cat-action-btn {
+    padding: 7px 11px !important;
+    font-size: 0.78rem !important;
+    border-radius: 8px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+  }
+
+  .cat-action-btn span {
+    display: none !important;
+  }
+}
+
+/* Kategori Silinemez Uyarı Kutusu */
+.cat-delete-blocked-box {
+  background: #fff8f8;
+  border: 1.5px solid #fed7d7;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(184, 74, 57, 0.08);
+}
+
+/* Loading & Empty States */
+.cat-loading-state, .cat-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+  color: #486b78;
+}
+
+.cat-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #b6ced6;
+  border-top-color: #346c80;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 14px;
+}
+
+.cat-empty-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  background: #cce2e9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.cat-empty-state h3 {
+  margin: 0 0 8px;
+  font-size: 1.2rem;
+  color: #1e292d;
+  font-weight: 700;
+}
+
+.cat-empty-state p {
+  margin: 0 0 20px;
+  font-size: 0.9rem;
+}
+
+/* Modallar (Kompakt ve Şık Tasarım - Sıfır Scroll Bar) */
+.cat-modal-compact {
+  max-width: 410px !important;
+  padding: 20px 22px !important;
+  border-radius: 20px !important;
+  max-height: 94vh !important;
+  overflow-y: auto !important;
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important;  /* IE/Edge */
+}
+
+.cat-modal-compact::-webkit-scrollbar {
+  display: none !important; /* Chrome / Safari */
+}
+
+.cat-modal-header-compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f2e9df;
+}
+
+.cat-modal-icon-badge-sm {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #d3e5eb;
+  color: #346c80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cat-modal-close-btn-sm {
+  background: #dbe9ee;
+  border: 1px solid #b6ced6;
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #324f5a;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cat-modal-close-btn-sm:hover {
+  background: #cce2e9;
+  color: #1e292d;
+}
+
+.cat-modal-form-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+/* Ortada Kare Görsel Yükleme & Önizleme Alanı */
+.cat-square-upload-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.cat-square-dropzone {
+  width: 110px;
+  height: 110px;
+  border: 2px dashed #d8c6b5;
+  border-radius: 20px;
+  background: #f8fbfc;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  gap: 2px;
+}
+
+.cat-square-dropzone:hover {
+  border-color: #346c80;
+  background: #fbf6ef;
+  transform: scale(1.02);
+}
+
+.cat-square-icon-circle {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #d3e5eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px;
+}
+
+.cat-square-upload-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #1b414f;
+}
+
+.cat-square-upload-sub {
+  font-size: 0.68rem;
+  color: #5d818f;
+}
+
+.cat-square-preview-box {
+  width: 110px;
+  height: 110px;
+  border-radius: 20px;
+  position: relative;
+  overflow: hidden;
+  border: 2px solid #e2d3c3;
+  box-shadow: 0 4px 14px rgba(27, 65, 79, 0.1);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.cat-square-preview-box:hover {
+  transform: scale(1.02);
+}
+
+.cat-square-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.cat-square-remove-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: rgba(30, 41, 45, 0.82);
+  color: #ffffff;
+  border: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  z-index: 2;
+}
+
+.cat-square-remove-btn:hover {
+  background: #b84a39;
+}
+
+.cat-square-change-tag {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(30, 41, 45, 0.72);
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 3px 0;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  backdrop-filter: blur(2px);
+}
+
+.cat-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.cat-form-label {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #1e292d;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cat-form-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #b6ced6;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+}
+
+.cat-form-input:focus {
+  border-color: #346c80;
+  box-shadow: 0 0 0 3px rgba(52, 108, 128, 0.12);
+}
+
+.cat-form-switch-row-compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  background: #dbe9ee;
+  border: 1px solid #b6ced6;
+  border-radius: 12px;
+}
+
+.cat-modal-footer-compact {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 2px;
+  padding-top: 12px;
+  border-top: 1px solid #f2e9df;
+}
+
+.cat-btn-primary {
+  background: #346c80;
+  color: #ffffff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(52, 108, 128, 0.25);
+}
+
+.cat-btn-primary:hover:not(:disabled) {
+  background: #265464;
+  transform: translateY(-1px);
+}
+
+.cat-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cat-btn-secondary {
+  background: #dbe9ee;
+  border: 1px solid #b6ced6;
+  color: #324f5a;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cat-btn-secondary:hover:not(:disabled) {
+  background: #ede2d4;
+  color: #1e292d;
+}
+
+.cat-btn-danger {
+  background: #b84a39;
+  color: #ffffff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(184, 74, 57, 0.25);
+}
+
+.cat-btn-danger:hover:not(:disabled) {
+  background: #9e3d2e;
+}
+
+.cat-btn-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Silme Onay Modal Detayları */
+.cat-delete-modal {
+  text-align: center;
+}
+
+.cat-delete-icon-wrapper {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #fdf2f0;
+  border: 1px solid #f6cfc7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.cat-delete-title {
+  margin: 0 0 10px;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #1e292d;
+}
+
+.cat-delete-desc {
+  margin: 0 0 14px;
+  font-size: 0.88rem;
+  color: #324f5a;
+  line-height: 1.5;
+}
+
+.cat-delete-warning-box {
+  background: #fffbeb;
+  border: 1px solid #fef3c7;
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: #b45309;
+  text-align: left;
+}
+
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

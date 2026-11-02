@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { createSocket } from '../lib/api';
 import axios from 'axios';
-import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
 import Sidebar from './Sidebar';
 import UserSwitcher from './UserSwitcher';
 import Navbar from './Navbar';
 import TableOrderModal from './TableOrderModal';
+import { useToast } from './ui/ToastProvider';
+import { useConfirm } from './ui/ConfirmProvider';
 import { 
   Coffee, 
   Menu, 
@@ -20,11 +22,36 @@ import {
   Check,
   GripVertical,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Clock,
+  QrCode,
+  BellRing
 } from 'lucide-react';
+import useQrRequests from './qr/useQrRequests';
+import QrRequestsModal from './qr/QrRequestsModal';
+import QrInbox from './qr/QrInbox';
+import QrOrderingToggle from './qr/QrOrderingToggle';
+import TableQrModal from './qr/TableQrModal';
+import { printQrCards, MENU_URL_CONFIGURED, MENU_URL_WARNING } from '../lib/qrMenu';
+
+// Masa kodu adla aynı numarayı taşıyorsa ("Masa 1" / "M-1") kartta tekrar göstermeye gerek yok
+const isRedundantCode = (title, code) => {
+  const digits = (s) => String(s).replace(/\D/g, '');
+  return digits(code) !== '' && digits(title) === digits(code);
+};
 
 export default function TableList() {
-  const { user, logout } = useAuth();
+  const { user, logout, can, canAny } = useAuth();
+  const { showToast } = useToast();
+  const confirm = useConfirm();
+
+  // QR menü siparişleri: onay bekleyenler ve masa QR kodu penceresi
+  // (yeni sipariş sesi ve mesajı her sayfada çalışan QrNotifier'dadır)
+  const [showQrRequests, setShowQrRequests] = useState(false);
+  const [qrTable, setQrTable] = useState(null);
+  const { requests: qrRequests, reload: reloadQr } = useQrRequests({ enabled: can('pos.view') });
+  // Salon düzeni yetkileri: masa ekleme / düzenleme-sıralama / kaldırma
+  const canManageTables = canAny(['tables.create', 'tables.edit', 'tables.delete']);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   
@@ -60,23 +87,27 @@ export default function TableList() {
   useEffect(() => {
     fetchTables();
 
-    const socket = io();
+    const socket = createSocket();
 
-    socket.on('table_created', (newTable) => {
+    socket.on('table:created', (newTable) => {
       setTables((prev) => [...prev, newTable]);
     });
 
-    socket.on('table_updated', (updated) => {
-      setTables((prev) =>
-        prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t))
-      );
+    // Sipariş, ödeme, iptal vb. sonrası masa durumu/tutarı/açılış saati değişir; güncel hali sunucudan al
+    socket.on('table:updated', () => {
+      fetchTables();
     });
 
-    socket.on('table_deleted', ({ id }) => {
+    // QR sipariş geldi / onaylandı / reddedildi: masa kartlarındaki QR rozeti güncellensin
+    socket.on('qr:request', () => {
+      fetchTables();
+    });
+
+    socket.on('table:deleted', ({ id }) => {
       setTables((prev) => prev.filter((t) => t.id !== id));
     });
 
-    socket.on('tables_reordered', (tableIds) => {
+    socket.on('tables:reordered', (tableIds) => {
       setTables((prev) => {
         const sorted = [...prev].sort((a, b) => {
           return tableIds.indexOf(a.id) - tableIds.indexOf(b.id);
@@ -225,17 +256,22 @@ export default function TableList() {
   // Masayı Kaldır (Soft Delete - Geçmiş siparişleri korur)
   const handleDeleteTable = async (tableId, e) => {
     e.stopPropagation();
-    if (!window.confirm('Bu masayı salondan kaldırmak istediğinize emin misiniz? (Geçmiş sipariş ve satış kayıtları korunacaktır)')) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Masa kaldırılsın mı?',
+      message: 'Masa salondan kaldırılacak. Geçmiş sipariş ve satış kayıtları korunur.',
+      confirmLabel: 'Masayı kaldır',
+      danger: true
+    });
+    if (!ok) return;
 
     try {
       const res = await axios.delete(`/api/tables/${tableId}`);
       if (res.data.success) {
+        showToast(res.data.message || 'Masa kaldırıldı.', 'deleted');
         fetchTables();
       }
     } catch (error) {
-      alert(error.response?.data?.message || 'Masa kaldırılamadı.');
+      showToast(error.response?.data?.message || 'Masa kaldırılamadı.', 'error');
     }
   };
 
@@ -260,22 +296,14 @@ export default function TableList() {
           label: 'Dolu', 
           bg: '#fbf0ed', 
           border: '#f3c7be', 
-          color: '#c65742',
-          cardBg: '#fef5f2',
-          cardBorder: '#f2b8ac',
-          cardShadow: '0 8px 24px -4px rgba(198, 87, 66, 0.16), 0 2px 6px rgba(198, 87, 66, 0.08)',
-          priceColor: '#c65742'
+          color: '#c65742'
         };
       case 'bill_requested':
         return { 
           label: 'Hesap İstendi', 
           bg: '#fef7e7', 
           border: '#fae3a6', 
-          color: '#b88214',
-          cardBg: '#fffbf0',
-          cardBorder: '#fcd34d',
-          cardShadow: '0 8px 24px -4px rgba(184, 130, 20, 0.16), 0 2px 6px rgba(184, 130, 20, 0.08)',
-          priceColor: '#b88214'
+          color: '#b88214'
         };
       case 'empty':
       default:
@@ -283,14 +311,28 @@ export default function TableList() {
           label: 'Boş', 
           bg: '#eef5f0', 
           border: '#cce3d2', 
-          color: '#4d8058',
-          cardBg: '#ffffff',
-          cardBorder: '#b6ced6',
-          cardShadow: '0 8px 24px -4px rgba(27, 65, 79, 0.1), 0 2px 6px rgba(27, 65, 79, 0.05)',
-          priceColor: '#7f969f'
+          color: '#4d8058'
         };
     }
   };
+
+  // Dolu masaların "açık kalma süresi" dakikada bir güncellenir
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatElapsed = (openedAt) => {
+    if (!openedAt) return null;
+    const minutes = Math.max(0, Math.floor((now - new Date(openedAt).getTime()) / 60000));
+    if (minutes < 1) return 'Yeni';
+    if (minutes < 60) return `${minutes} dk`;
+    const h = Math.floor(minutes / 60), m = minutes % 60;
+    return m ? `${h} sa ${m} dk` : `${h} sa`;
+  };
+  const isLongStay = (openedAt) => openedAt && now - new Date(openedAt).getTime() > 90 * 60000;
+  const formatMoney = (v) => `₺${Number(v || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <div className="pos-page-container">
@@ -317,9 +359,10 @@ export default function TableList() {
             <div className="pos-stat-pill pos-stat-pill-occupied">
               Dolu: <strong>{occupiedCount}</strong>
             </div>
+            {can('pos.view') && <QrOrderingToggle canEdit={can('tables.edit')} />}
           </>
         }
-        actions={
+        actions={canManageTables && (
           <button
             onClick={() => setIsEditMode(!isEditMode)}
             className="pos-edit-btn"
@@ -335,7 +378,7 @@ export default function TableList() {
             {isEditMode ? <Check size={16} /> : <Settings size={16} />}
             <span>{isEditMode ? 'Bitir' : 'Düzenle'}</span>
           </button>
-        }
+        )}
       />
 
       {/* DÜZENLEME MODU AKTİF UYARI & İŞLEM ÇUBUĞU */}
@@ -376,6 +419,7 @@ export default function TableList() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            {can('tables.create') && (
             <button
               onClick={() => {
                 setTableTitle('');
@@ -402,7 +446,26 @@ export default function TableList() {
               <Plus size={14} />
               <span>Yeni Masa</span>
             </button>
+            )}
 
+            {can('tables.edit') && tables.length > 0 && (
+            <button
+              type="button"
+              className="pos-card-btn-qr"
+              style={{ padding: '7px 12px', fontSize: '0.8rem', borderRadius: '8px' }}
+              onClick={async () => {
+                if (!MENU_URL_CONFIGURED && !(await confirm({
+                  title: 'Menü adresi ayarlanmamış',
+                  message: MENU_URL_WARNING,
+                  confirmLabel: 'Yine de yazdır'
+                }))) return;
+                printQrCards(tables).catch(err => showToast(err.message, 'error'));
+              }}
+              title="Tüm masaların QR kodlarını yazdırılabilir kartlar olarak açar"
+            >
+              <QrCode size={14} /> Tüm QR kodlarını yazdır
+            </button>
+            )}
             <button
               onClick={() => setIsEditMode(false)}
               style={{
@@ -421,6 +484,19 @@ export default function TableList() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* ONAY BEKLEYEN QR SİPARİŞLERİ */}
+      {!isEditMode && (
+        <QrInbox
+          requests={qrRequests}
+          onShowAll={() => setShowQrRequests(true)}
+          onOpenTable={(tableId) => {
+            const table = tables.find(t => t.id === tableId);
+            if (table) setActiveOrderTable(table);
+            else setShowQrRequests(true);
+          }}
+        />
       )}
 
       {/* MASALAR IZGARASI (Mobilde 2 Sütun, Masaüstünde Çok Sütun) */}
@@ -453,30 +529,23 @@ export default function TableList() {
               return (
                 <div
                   key={table.id}
-                  className="pos-table-card"
-                  draggable={isEditMode}
+                  className={`pos-table-card is-${table.status || 'empty'} ${isEditMode ? 'is-editing' : ''} ${!isEditMode && Number(table.pending_qr_count) > 0 ? 'has-qr' : ''}`}
+                  draggable={isEditMode && can('tables.edit')}
                   onDragStart={(e) => handleDragStart(e, index)}
                   onDragEnter={() => handleDragEnter(index)}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, index)}
                   onDragEnd={handleDragEnd}
-                  style={{
-                    background: isDragOver ? '#fcf8f3' : statusInfo.cardBg,
-                    border: isDragOver
-                      ? '2.5px solid #346c80'
-                      : isEditMode 
-                        ? '2px dashed #3d778c' 
-                        : `1.5px solid ${statusInfo.cardBorder}`,
-                    boxShadow: isDragOver
-                      ? '0 16px 36px rgba(52, 108, 128, 0.25)'
-                      : isEditMode 
-                        ? '0 6px 18px rgba(61, 119, 140, 0.12)' 
-                        : statusInfo.cardShadow,
+                  // Normal görünüm (boş / dolu / hesap istendi) CSS sınıflarındadır; burada yalnızca sürükle-bırak ve düzenleme durumu
+                  style={isEditMode ? {
+                    background: isDragOver ? '#fcf8f3' : undefined,
+                    border: isDragOver ? '2.5px solid #346c80' : '2px dashed #3d778c',
+                    boxShadow: isDragOver ? '0 16px 36px rgba(52, 108, 128, 0.25)' : '0 6px 18px rgba(61, 119, 140, 0.12)',
                     opacity: isDragging ? 0.35 : 1,
                     transform: isDragOver ? 'scale(1.02)' : isDragging ? 'scale(0.96)' : 'none',
-                    cursor: isEditMode ? 'grab' : 'pointer',
-                    userSelect: isEditMode ? 'none' : 'auto'
-                  }}
+                    cursor: 'grab',
+                    userSelect: 'none'
+                  } : undefined}
                   onClick={() => {
                     if (!isEditMode) {
                       setActiveOrderTable(table);
@@ -490,23 +559,38 @@ export default function TableList() {
                         <GripVertical size={13} />
                         <span>#{index + 1}</span>
                       </div>
+                    ) : isOccupied && formatElapsed(table.opened_at) ? (
+                      <span
+                        className={`pos-card-elapsed ${isLongStay(table.opened_at) ? 'long' : ''}`}
+                        title={`Masa ${new Date(table.opened_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })} itibarıyla açık`}
+                      >
+                        <Clock size={12} />
+                        {formatElapsed(table.opened_at)}
+                      </span>
                     ) : (
                       <div />
                     )}
 
-                    <span 
-                      className="pos-table-status-badge"
-                      style={{
-                        background: statusInfo.bg,
-                        color: statusInfo.color,
-                        border: `1px solid ${statusInfo.border}`
-                      }}
-                    >
-                      <span className="pos-status-text-full">{statusInfo.label}</span>
-                      <span className="pos-status-text-short">
-                        {statusInfo.label === 'Hesap İstendi' ? 'Hesap' : statusInfo.label}
+                    {isOccupied ? (
+                      <span className="pos-card-status-pill">
+                        <i className="pos-card-status-dot" />
+                        <span className="pos-status-text-full">{statusInfo.label}</span>
+                        <span className="pos-status-text-short">
+                          {statusInfo.label === 'Hesap İstendi' ? 'Hesap' : statusInfo.label}
+                        </span>
                       </span>
-                    </span>
+                    ) : (
+                      <span
+                        className="pos-table-status-badge"
+                        style={{
+                          background: statusInfo.bg,
+                          color: statusInfo.color,
+                          border: `1px solid ${statusInfo.border}`
+                        }}
+                      >
+                        {statusInfo.label}
+                      </span>
+                    )}
                   </div>
 
                   {/* ORTA KISIM: Y Ekseninde Masanın Ortasında, Sola Yaslı Masa Adı ve Kodu */}
@@ -514,7 +598,9 @@ export default function TableList() {
                     <h3 className="pos-table-title">
                       {table.title || table.table_number}
                     </h3>
-                    {table.table_number && table.title && table.title !== table.table_number && (
+                    {/* Kod, adla aynı bilgiyi veriyorsa ("Masa 1" / "M-1") yalnızca düzenleme modunda gösterilir */}
+                    {table.table_number && table.title && table.title !== table.table_number &&
+                      (isEditMode || !isRedundantCode(table.title, table.table_number)) && (
                       <span className="pos-table-code">
                         {table.table_number}
                       </span>
@@ -525,6 +611,7 @@ export default function TableList() {
                   <div className="pos-card-bottom-row">
                     {isEditMode ? (
                       <div className="pos-card-edit-actions">
+                        {can('tables.edit') && (
                         <button
                           onClick={(e) => openEditModal(table, e)}
                           className="pos-card-btn-edit"
@@ -533,7 +620,21 @@ export default function TableList() {
                           <Edit2 size={12} />
                           <span>Düzenle</span>
                         </button>
+                        )}
 
+                        {can('tables.edit') && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setQrTable(table); }}
+                          className="pos-card-btn-qr"
+                          title="Masanın QR kodunu göster / indir / yazdır"
+                        >
+                          <QrCode size={12} />
+                          <span>QR</span>
+                        </button>
+                        )}
+
+                        {can('tables.delete') && (
                         <button
                           onClick={(e) => handleDeleteTable(table.id, e)}
                           disabled={isOccupied}
@@ -543,20 +644,24 @@ export default function TableList() {
                           <Trash2 size={12} />
                           <span>Sil</span>
                         </button>
+                        )}
                       </div>
                     ) : (
                       <div />
                     )}
 
                     {isOccupied && (
-                      <div 
-                        className="pos-card-amount"
-                        style={{ color: statusInfo.priceColor }}
-                      >
-                        {Number(table.active_total || 0).toFixed(2)} ₺
-                      </div>
+                      <span className="pos-card-amount">{formatMoney(table.active_total)}</span>
                     )}
                   </div>
+
+                  {/* Bu masadan gelen, onay bekleyen QR sipariş */}
+                  {!isEditMode && Number(table.pending_qr_count) > 0 && (
+                    <span className="pos-card-qr-badge">
+                      <BellRing size={12} />
+                      {Number(table.pending_qr_count) > 1 ? `${table.pending_qr_count} yeni sipariş` : 'Yeni sipariş'}
+                    </span>
+                  )}
                 </div>
               );
             })}
@@ -756,9 +861,31 @@ export default function TableList() {
       {/* Masa Sipariş & Adisyon Ekranı Modalı */}
       {activeOrderTable && (
         <TableOrderModal 
+          key={activeOrderTable.id}
           table={activeOrderTable}
           onClose={() => setActiveOrderTable(null)}
           onTableUpdated={fetchTables}
+          onTableSwitched={setActiveOrderTable}
+        />
+      )}
+
+      {/* Onay bekleyen tüm QR siparişleri */}
+      {showQrRequests && (
+        <QrRequestsModal
+          requests={qrRequests}
+          canAct={can('pos.order')}
+          onClose={() => setShowQrRequests(false)}
+          onChanged={() => { reloadQr(); fetchTables(); }}
+        />
+      )}
+
+      {/* Masanın QR kodu */}
+      {qrTable && (
+        <TableQrModal
+          table={qrTable}
+          canRegenerate={can('tables.edit')}
+          onClose={() => setQrTable(null)}
+          onRegenerated={fetchTables}
         />
       )}
 

@@ -1,13 +1,12 @@
 import { pool } from '../config/db.js';
-import { optimizeAndSaveImage } from '../config/upload.js';
+import { optimizeAndSaveImage, removeUploadedImage } from '../config/upload.js';
 import ExcelJS from 'exceljs';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { getUserFromReq, logActivity } from '../config/auditLogger.js';
+import { can, deny } from '../middleware/auth.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Maliyet fiyatı yalnızca products.view_cost yetkisi olanlara gösterilir
+const stripCost = ({ cost_price, ...rest }) => rest;
+const withCostVisibility = (req, product) => (can(req.user, 'products.view_cost') ? product : stripCost(product));
 
 /**
  * Ürünleri listele
@@ -75,7 +74,7 @@ export const getProducts = async (req, res) => {
 
     res.json({ 
       success: true, 
-      products,
+      products: products.map(p => withCostVisibility(req, p)),
       stats: stats[0] || { total_count: 0, active_count: 0, passive_count: 0 }
     });
   } catch (error) {
@@ -122,10 +121,10 @@ export const createProduct = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Seçilen kategori bulunamadı veya silinmiş.' });
     }
 
-    // Fiyat ve maliyet parse
+    // Fiyat ve maliyet parse (maliyet yalnızca products.view_cost yetkisiyle girilebilir)
     const parsedPrice = parseFloat(price);
-    const parsedCostPrice = (cost_price !== undefined && cost_price !== null && cost_price !== '' && !isNaN(Number(cost_price))) 
-      ? parseFloat(cost_price) 
+    const parsedCostPrice = can(req.user, 'products.view_cost') && cost_price !== undefined && cost_price !== null && cost_price !== '' && !isNaN(Number(cost_price))
+      ? parseFloat(cost_price)
       : null;
 
     const parsedStatus = status !== undefined ? parseInt(status, 10) : 1;
@@ -135,7 +134,7 @@ export const createProduct = async (req, res) => {
     let finalImageUrl = null;
     if (req.file) {
       try {
-        finalImageUrl = await optimizeAndSaveImage(req.file.buffer, 'products', 500, 500);
+        finalImageUrl = await optimizeAndSaveImage(req.file.buffer, 'products');
       } catch (imgErr) {
         console.error('Ürün görsel optimizasyon hatası:', imgErr);
         return res.status(400).json({ success: false, message: 'Görsel işlenemedi: ' + imgErr.message });
@@ -206,12 +205,12 @@ export const createProduct = async (req, res) => {
     });
 
     // Socket.io ile diğer ekranlara bildir
-    req.io?.emit('product:created', newProduct);
+    req.io?.emit('product:created', stripCost(newProduct));
 
     res.status(201).json({
       success: true,
       message: 'Ürün başarıyla oluşturuldu.',
-      product: newProduct
+      product: withCostVisibility(req, newProduct)
     });
   } catch (error) {
     console.error('Ürün ekleme hatası:', error);
@@ -255,9 +254,18 @@ export const updateProduct = async (req, res) => {
     }
 
     const parsedPrice = parseFloat(price);
-    const parsedCostPrice = (cost_price !== undefined && cost_price !== null && cost_price !== '' && !isNaN(Number(cost_price))) 
-      ? parseFloat(cost_price) 
-      : null;
+
+    // Satış fiyatı değişikliği ayrı (kritik) bir yetkidir
+    if (Math.abs(parsedPrice - parseFloat(currentProduct.price)) > 0.001 && !can(req.user, 'products.price')) {
+      return deny(res, 'products.price');
+    }
+
+    // Maliyeti göremeyen kullanıcı maliyeti değiştiremez; formdan gelen boş değer mevcut maliyeti silmesin
+    const parsedCostPrice = !can(req.user, 'products.view_cost')
+      ? (currentProduct.cost_price === null ? null : parseFloat(currentProduct.cost_price))
+      : (cost_price !== undefined && cost_price !== null && cost_price !== '' && !isNaN(Number(cost_price)))
+        ? parseFloat(cost_price)
+        : null;
 
     let parsedStatus = currentProduct.status;
     if (status !== undefined) {
@@ -269,31 +277,17 @@ export const updateProduct = async (req, res) => {
 
     // Görsel silme talebi
     if (remove_image === 'true' || remove_image === true) {
-      if (currentProduct.image_url && currentProduct.image_url.startsWith('/uploads/')) {
-        try {
-          const oldPath = path.resolve(__dirname, '../../', currentProduct.image_url.replace(/^\//, ''));
-          if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-        } catch (e) {
-          console.warn('Eski görsel silinemedi:', e.message);
-        }
-      }
+      removeUploadedImage(currentProduct.image_url); // Ana görsel ve küçük kopyası
       finalImageUrl = null;
     }
 
     // Yeni görsel yüklendiyse optimize et
     if (req.file) {
       try {
-        finalImageUrl = await optimizeAndSaveImage(req.file.buffer, 'products', 500, 500);
+        finalImageUrl = await optimizeAndSaveImage(req.file.buffer, 'products');
 
-        // Eski dosyayı temizle
-        if (currentProduct.image_url && currentProduct.image_url.startsWith('/uploads/')) {
-          try {
-            const oldPath = path.resolve(__dirname, '../../', currentProduct.image_url.replace(/^\//, ''));
-            if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-          } catch (e) {
-            console.warn('Eski görsel silinemedi:', e.message);
-          }
-        }
+        // Eski dosyayı (ve küçük kopyasını) temizle
+        removeUploadedImage(currentProduct.image_url);
       } catch (imgErr) {
         console.error('Görsel optimizasyon hatası:', imgErr);
         return res.status(400).json({ success: false, message: 'Görsel işlenemedi: ' + imgErr.message });
@@ -377,12 +371,12 @@ export const updateProduct = async (req, res) => {
 
     const updatedProduct = updatedRows[0];
 
-    req.io?.emit('product:updated', updatedProduct);
+    req.io?.emit('product:updated', stripCost(updatedProduct));
 
     res.json({
       success: true,
       message: 'Ürün başarıyla güncellendi.',
-      product: updatedProduct
+      product: withCostVisibility(req, updatedProduct)
     });
   } catch (error) {
     console.error('Ürün güncelleme hatası:', error);
@@ -435,12 +429,12 @@ export const toggleProductStatus = async (req, res) => {
 
     const updatedProduct = updatedRows[0];
 
-    req.io?.emit('product:updated', updatedProduct);
+    req.io?.emit('product:updated', stripCost(updatedProduct));
 
     res.json({
       success: true,
       message: newStatus === 1 ? 'Ürün aktifleştirildi.' : 'Ürün pasife alındı.',
-      product: updatedProduct
+      product: withCostVisibility(req, updatedProduct)
     });
   } catch (error) {
     console.error('Ürün durumu değiştirme hatası:', error);
@@ -499,12 +493,12 @@ export const toggleProductQrStatus = async (req, res) => {
     `, [id]);
 
     const updatedProduct = updatedRows[0];
-    req.io?.emit('product:updated', updatedProduct);
+    req.io?.emit('product:updated', stripCost(updatedProduct));
 
     res.json({
       success: true,
       message: `"${existing[0].name}" QR menüde ${targetQr === 1 ? 'gösterilecek' : 'gizlendi'}.`,
-      product: updatedProduct
+      product: withCostVisibility(req, updatedProduct)
     });
   } catch (error) {
     console.error('QR menü durum değiştirme hatası:', error);
@@ -692,7 +686,10 @@ export const exportProductsToExcel = async (req, res) => {
       { key: 'ingredients', header: 'İçindekiler / Malzemeler', width: 44 }
     ];
 
-    const activeHeaders = allHeaders.filter(h => h.isAlways || isIncluded(h.key));
+    // Maliyet sütunu yalnızca products.view_cost yetkisiyle dışa aktarılır
+    const activeHeaders = allHeaders
+      .filter(h => h.key !== 'cost_price' || can(req.user, 'products.view_cost'))
+      .filter(h => h.isAlways || isIncluded(h.key));
 
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Özgensoy Kafeterya';

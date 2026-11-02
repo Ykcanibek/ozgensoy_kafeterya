@@ -11,8 +11,8 @@
   "dependencies": {
     "axios": "^1.6.8",
     "clsx": "^2.1.1",
-    "kafe-otomasyon-projesi": "file:..",
     "lucide-react": "^0.378.0",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.18.4",

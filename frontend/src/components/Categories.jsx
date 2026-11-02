@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { thumbSrc, handleThumbError, prepareImageForUpload } from '../lib/images';
+import { useToast } from './ui/ToastProvider';
+import { useAuth } from '../context/AuthContext';
+import { apiFetch, createSocket } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
-import { io } from 'socket.io-client';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
 import HistoryModal from './HistoryModal';
@@ -32,6 +35,9 @@ import {
 } from 'lucide-react';
 
 export default function Categories() {
+  const { can } = useAuth();
+  // Kategori sayfası yetkileri (sunucu ayrıca uygular)
+  const canEditCategory = can('categories.edit');
   const navigate = useNavigate();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -63,19 +69,15 @@ export default function Categories() {
   const [historyLoading, setHistoryLoading] = useState(false);
 
   // Bildirim Toast mesajı ({ message, type: 'success' | 'danger' | 'info' })
-  const [toast, setToast] = useState(null);
   const fileInputRef = useRef(null);
 
-  const showToast = (message, type = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3200);
-  };
+  const { showToast } = useToast(); // Global bildirimler (üst ortada, türe göre)
 
   // Kategorileri sunucudan yükle
   const fetchCategories = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/categories');
+      const res = await apiFetch('/api/categories');
       const data = await res.json();
       if (data.success) {
         setCategories(data.categories || []);
@@ -92,7 +94,7 @@ export default function Categories() {
   useEffect(() => {
     fetchCategories();
 
-    const socket = io();
+    const socket = createSocket();
 
     socket.on('category:created', (newCat) => {
       setCategories(prev => {
@@ -147,7 +149,7 @@ export default function Categories() {
     setHistoryModalCategory(cat);
     setHistoryLoading(true);
     try {
-      const res = await fetch(`/api/categories/${cat.id}/history`);
+      const res = await apiFetch(`/api/categories/${cat.id}/history`);
       const data = await res.json();
       if (data.success) {
         setCategoryHistory(data.history || []);
@@ -203,6 +205,10 @@ export default function Categories() {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (!file.type.startsWith('image/')) {
+        showToast('Lütfen geçerli bir resim dosyası seçin (.jpg, .png, .webp)', 'warning');
+        return;
+      }
       setImageFile(file);
       const url = URL.createObjectURL(file);
       setImagePreview(url);
@@ -234,7 +240,7 @@ export default function Categories() {
       formData.append('status', formStatus);
 
       if (imageFile) {
-        formData.append('image', imageFile);
+        formData.append('image', await prepareImageForUpload(imageFile)); // Büyük fotoğraf tarayıcıda küçültülür
       } else if (!imagePreview && modalMode === 'edit') {
         // Önizleme de boşaltılmışsa resmi sil
         formData.append('image_url', '');
@@ -248,10 +254,8 @@ export default function Categories() {
         method = 'PUT';
       }
 
-      const token = localStorage.getItem('kafe_token');
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData
       });
 
@@ -280,13 +284,9 @@ export default function Categories() {
     setCategories(prev => prev.map(c => c.id === cat.id ? { ...c, status: nextStatus } : c));
 
     try {
-      const token = localStorage.getItem('kafe_token');
-      const res = await fetch(`/api/categories/${cat.id}/status`, {
+      const res = await apiFetch(`/api/categories/${cat.id}/status`, {
         method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: nextStatus })
       });
       const data = await res.json();
@@ -317,13 +317,9 @@ export default function Categories() {
     setCategories(prev => prev.map(c => c.id === cat.id ? { ...c, show_in_qr: nextQr } : c));
 
     try {
-      const token = localStorage.getItem('kafe_token');
-      const res = await fetch(`/api/categories/${cat.id}/qr-status`, {
+      const res = await apiFetch(`/api/categories/${cat.id}/qr-status`, {
         method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ show_in_qr: nextQr })
       });
       const data = await res.json();
@@ -351,10 +347,8 @@ export default function Categories() {
 
     try {
       setIsDeleting(true);
-      const token = localStorage.getItem('kafe_token');
-      const res = await fetch(`/api/categories/${deleteModalCategory.id}`, {
-        method: 'DELETE',
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      const res = await apiFetch(`/api/categories/${deleteModalCategory.id}`, {
+        method: 'DELETE'
       });
       const data = await res.json();
       if (data.success) {
@@ -416,13 +410,9 @@ export default function Categories() {
     // Sunucuya kaydet
     try {
       setIsReordering(true);
-      const token = localStorage.getItem('kafe_token');
-      const res = await fetch('/api/categories/reorder', {
+      const res = await apiFetch('/api/categories/reorder', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderedIds })
       });
       const data = await res.json();
@@ -476,6 +466,7 @@ export default function Categories() {
           </>
         }
         actions={
+          can('categories.create') && (
           <button
             type="button"
             onClick={handleOpenAddModal}
@@ -490,6 +481,7 @@ export default function Categories() {
             <Plus size={16} />
             <span>Yeni Kategori</span>
           </button>
+          )
         }
       />
 
@@ -530,6 +522,7 @@ export default function Categories() {
           <h3>{searchQuery ? 'Aramanızla eşleşen kategori bulunamadı' : 'Henüz hiç kategori eklenmemiş'}</h3>
           <p>{searchQuery ? 'Farklı bir arama terimi deneyin.' : 'Menünüzü oluşturmak için hemen ilk kategorinizi ekleyin.'}</p>
           {!searchQuery && (
+            <>{can('categories.create') && (
             <button
               type="button"
               onClick={handleOpenAddModal}
@@ -538,6 +531,7 @@ export default function Categories() {
               <Plus size={18} />
               <span>İlk Kategoriyi Ekle</span>
             </button>
+            )}</>
           )}
         </div>
       ) : (
@@ -566,9 +560,9 @@ export default function Categories() {
                   <div 
                     className="cat-drag-handle" 
                     title="Sırasını değiştirmek için buradan basılı tutup sürükleyin"
-                    onMouseDown={() => setDragAllowedId(cat.id)}
+                    onMouseDown={() => canEditCategory && setDragAllowedId(cat.id)}
                     onMouseUp={() => setDragAllowedId(null)}
-                    onTouchStart={() => setDragAllowedId(cat.id)}
+                    onTouchStart={() => canEditCategory && setDragAllowedId(cat.id)}
                     onTouchEnd={() => setDragAllowedId(null)}
                   >
                     <GripVertical size={18} />
@@ -579,17 +573,12 @@ export default function Categories() {
                   <div className="cat-thumb-wrapper">
                     {cat.image_url ? (
                       <img
-                        src={cat.image_url}
+                        src={thumbSrc(cat.image_url)}
                         alt={cat.name}
                         className="cat-thumb-img"
                         loading="lazy"
                         decoding="async"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          if (e.currentTarget.nextSibling) {
-                            e.currentTarget.nextSibling.style.display = 'flex';
-                          }
-                        }}
+                        onError={(e) => handleThumbError(e, cat.image_url)}
                       />
                     ) : null}
                     <div 
@@ -629,6 +618,7 @@ export default function Categories() {
                         type="button"
                         className={`cat-qr-btn ${isPassive ? 'disabled' : isQrOn ? 'active' : 'inactive'}`}
                         onClick={(e) => handleToggleQrStatus(cat, e)}
+                        disabled={!canEditCategory}
                         title={
                           isPassive
                             ? 'Kategori pasif olduğu için QR menüde kapalıdır (Önce kategoriyi aktif yapın)'
@@ -654,6 +644,7 @@ export default function Categories() {
                       <input
                         type="checkbox"
                         checked={cat.status === 1}
+                        disabled={!canEditCategory}
                         onChange={(e) => handleToggleStatus(cat, e)}
                       />
                       <span className="cat-slider"></span>
@@ -664,6 +655,7 @@ export default function Categories() {
                   </div>
 
                   {/* Düzenle Butonu */}
+                  {canEditCategory && (
                   <button
                     type="button"
                     className="cat-action-btn edit"
@@ -673,6 +665,7 @@ export default function Categories() {
                     <Edit3 size={15} />
                     <span>Düzenle</span>
                   </button>
+                  )}
 
                   {/* Geçmiş Butonu */}
                   <button
@@ -686,6 +679,7 @@ export default function Categories() {
                   </button>
 
                   {/* Sil Butonu */}
+                  {can('categories.delete') && (
                   <button
                     type="button"
                     className="cat-action-btn delete"
@@ -695,6 +689,7 @@ export default function Categories() {
                     <Trash2 size={15} />
                     <span>Sil</span>
                   </button>
+                  )}
                 </div>
               </div>
             );
@@ -948,17 +943,6 @@ export default function Categories() {
         onRefresh={() => historyModalCategory && handleOpenHistoryModal(historyModalCategory)}
       />
 
-      {/* Toast Bildirim Kutusu (Duruma Özel Renkler & Simgeler) */}
-      {toast && (
-        <div className={`cat-toast ${toast.type || 'info'}`}>
-          <div className="cat-toast-icon">
-            {toast.type === 'success' && <CheckCircle2 size={20} color="#4ade80" />}
-            {toast.type === 'danger' && <Trash2 size={20} color="#f87171" />}
-            {toast.type === 'info' && <Sparkles size={20} color="#e5a968" />}
-          </div>
-          <span>{toast.message}</span>
-        </div>
-      )}
     </div>
   );
 }

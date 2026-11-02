@@ -1,5 +1,5 @@
 import { pool } from '../config/db.js';
-import { optimizeAndSaveImage } from '../config/upload.js';
+import { optimizeAndSaveImage, removeUploadedImage } from '../config/upload.js';
 import { getUserFromReq, logActivity } from '../config/auditLogger.js';
 
 /**
@@ -67,7 +67,7 @@ export const createCategory = async (req, res) => {
     // Eğer görsel dosyası yüklendiyse WebP olarak optimize et
     if (req.file) {
       try {
-        finalImageUrl = await optimizeAndSaveImage(req.file.buffer, 'categories', 500, 500);
+        finalImageUrl = await optimizeAndSaveImage(req.file.buffer, 'categories');
       } catch (imgErr) {
         console.error('Görsel optimizasyon hatası:', imgErr);
         return res.status(400).json({ success: false, message: 'Görsel işlenemedi: ' + imgErr.message });
@@ -146,7 +146,7 @@ export const updateCategory = async (req, res) => {
     // Yeni görsel yüklendiyse WebP olarak optimize et
     if (req.file) {
       try {
-        finalImageUrl = await optimizeAndSaveImage(req.file.buffer, 'categories', 500, 500);
+        finalImageUrl = await optimizeAndSaveImage(req.file.buffer, 'categories');
       } catch (imgErr) {
         console.error('Görsel optimizasyon hatası:', imgErr);
         return res.status(400).json({ success: false, message: 'Görsel işlenemedi: ' + imgErr.message });
@@ -180,6 +180,11 @@ export const updateCategory = async (req, res) => {
        WHERE id = ?`,
       [updatedName, updatedIcon, finalImageUrl, updatedStatus, user.id, id]
     );
+
+    // Görsel değiştiyse/kaldırıldıysa eski dosyayı diskten temizle (sunucuda biriken yetim dosyalar olmasın)
+    if (prev.image_url && prev.image_url !== finalImageUrl) {
+      removeUploadedImage(prev.image_url);
+    }
 
     const [updatedRows] = await pool.query(
       `SELECT 

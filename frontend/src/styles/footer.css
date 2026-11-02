@@ -1,0 +1,123 @@
+/* ======================================================== */
+/* SAYFA İSKELETİ & ALT BİLGİ (FOOTER)                      */
+/* ======================================================== */
+
+/* Sayfa içeriği kısa olsa da alt bilgi ekranın en altında durur */
+.app-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.app-shell > .pos-page-container,
+.app-shell > .app-error-screen {
+  flex: 1 0 auto;
+  min-height: 0;
+}
+
+/* z-index 0: arka plan dokusunun üstünde, sayfa katmanının (.pos-page-container, z-index 1) altında kalır.
+   Yan menü ve pencereler o katmanın içinde olduğundan footer bunların üstüne çıkmaz. */
+.app-footer {
+  position: relative;
+  z-index: 0;
+  padding: 0 24px 18px;
+}
+.app-footer-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  /* Üst barla aynı beyaz kart görünümü */
+  background: #ffffff;
+  border: 1.5px solid #b6ced6;
+  border-radius: 20px;
+  box-shadow: 0 8px 30px -4px rgba(27, 65, 79, 0.12);
+  padding: 14px 22px;
+  font-size: 0.8rem;
+  color: #6b8590;
+  font-weight: 600;
+}
+.app-footer-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.9rem;
+  letter-spacing: -0.2px;
+}
+.app-footer-brand svg { color: #346c80; margin-right: 2px; }
+.app-footer-brand .brand-ozgensoy { color: #346c80; font-weight: 800; }
+.app-footer-brand .brand-kafeterya { color: #d93829; font-weight: 800; }
+
+@media (max-width: 767px) {
+  .app-footer { padding: 0 6px 10px; }
+  .app-footer-inner { justify-content: center; text-align: center; flex-direction: column; padding: 12px 14px; border-radius: 14px; }
+}
+
+/* Yazdırırken alt bilgi çıkmaz */
+@media print {
+  .app-footer { display: none !important; }
+}
+
+/* ======================================================== */
+/* HATA EKRANI (ErrorBoundary)                              */
+/* ======================================================== */
+.app-error-screen {
+  position: relative;
+  z-index: 1;
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 12px;
+}
+.app-error-card {
+  max-width: 480px;
+  width: 100%;
+  background: #ffffff;
+  border: 1.5px solid #b6ced6;
+  border-radius: 20px;
+  box-shadow: 0 8px 30px -4px rgba(27, 65, 79, 0.12);
+  padding: 26px 24px;
+  text-align: center;
+  color: #173845;
+}
+.app-error-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: #fff3df;
+  color: #a85a00;
+  margin-bottom: 10px;
+}
+.app-error-card h2 { margin: 0 0 8px; font-size: 1.15rem; font-weight: 800; }
+.app-error-card p { margin: 0 0 12px; font-size: 0.88rem; color: #486b78; line-height: 1.5; }
+.app-error-card code {
+  display: block;
+  margin: 0 0 16px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f5f9fa;
+  color: #6b8590;
+  font-size: 0.74rem;
+  word-break: break-word;
+}
+.app-error-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.app-error-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1.5px solid #b6ced6;
+  background: #ffffff;
+  color: #173845;
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-family: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.app-error-actions button.primary { background: #346c80; border-color: #346c80; color: #ffffff; }

@@ -1,0 +1,650 @@
+/* ======================================================== */
+/* 6. GELİŞMİŞ GEÇMİŞ VE HAREKET MODALI (HISTORY MODAL)     */
+/* ======================================================== */
+
+.history-modal-container {
+  width: 860px !important;
+  max-width: 95vw !important;
+  height: 650px !important;            /* Sabit yükseklik: 0, 1 veya 50 kayıt fark etmeksizin ASLA boyutu değişmez */
+  min-height: 650px !important;
+  max-height: 650px !important;
+  border-radius: 20px !important;
+  padding: 0 !important;
+  margin: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;          /* Dış çerçeve ASLA kaymaz, başlık ve özet kartı sabit kalır */
+  overflow-y: hidden !important;
+  overflow-x: hidden !important;
+  box-shadow: 0 24px 60px -12px rgba(30, 41, 45, 0.38) !important;
+  border: 1px solid #b6ced6 !important;
+  background: #ffffff !important;
+  position: relative !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-height: 720px) {
+  .history-modal-container {
+    height: 92vh !important;
+    min-height: 92vh !important;
+    max-height: 92vh !important;
+  }
+}
+
+.history-modal-header {
+  flex-shrink: 0;
+  padding: 14px 24px;
+  border-bottom: 1.5px solid #b6ced6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  gap: 16px;
+}
+
+.history-header-entity-name {
+  margin: 0;
+  font-size: 1.24rem !important;
+  font-weight: 800;
+  color: #1e292d;
+  font-family: 'Outfit', sans-serif;
+  max-width: 520px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-entity-type-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #d3e5eb;
+  color: #346c80;
+  border: 1px solid #b6ced6;
+}
+
+.history-btn-refresh {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #b6ced6;
+  background: #f8fbfc;
+  color: #346c80;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.history-btn-refresh:hover {
+  background: #d3e5eb;
+  color: #1b414f;
+}
+
+/* Varlık Özet Kartı (Genişletilmiş, dengeli ve ferah 3 sütunlu yerleşim) */
+.history-entity-card {
+  flex-shrink: 0 !important;
+  background: linear-gradient(135deg, #f8fbfc 0%, #f6eee5 100%);
+  border-bottom: 1.5px solid #b6ced6;
+  padding: 10px 22px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 16px !important;
+  min-height: 68px !important;
+  box-sizing: border-box !important;
+}
+
+.history-entity-card-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-width: 220px;
+}
+
+.history-entity-thumb {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 10px !important;
+  border: 1.5px solid #b6ced6 !important;
+  background: #ffffff;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(27, 65, 79, 0.06);
+}
+
+.history-entity-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.history-entity-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #dbe9ee;
+}
+
+.history-entity-details {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.history-entity-title {
+  margin: 0;
+  font-size: 1.12rem !important;
+  font-weight: 800;
+  color: #1e292d;
+  font-family: 'Outfit', sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px; /* Ürün adına ferah ve geniş alan */
+  line-height: 1.25;
+}
+
+.history-entity-badges-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+/* Fiyat Değişim Özeti Kartı (Orta Sütun) */
+.history-entity-price-tracker {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: #ffffff;
+  border: 1.5px solid #b6ced6;
+  border-radius: 10px;
+  padding: 5px 14px;
+  box-shadow: 0 2px 6px rgba(27, 65, 79, 0.04);
+  flex-shrink: 0;
+  min-width: 220px;
+}
+
+.history-tracker-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.history-tracker-header-lbl {
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #486b78;
+  letter-spacing: 0.4px;
+}
+
+.history-tracker-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: 5px;
+}
+
+.history-tracker-badge.up {
+  background: #eaf6ed;
+  color: #1e7e34;
+  border: 1px solid #b8e2c3;
+}
+
+.history-tracker-badge.down {
+  background: #fdf2f2;
+  color: #b84a39;
+  border: 1px solid #f7c5c0;
+}
+
+.history-tracker-badge.neutral {
+  background: #d3e5eb;
+  color: #486b78;
+  border: 1px solid #b6ced6;
+}
+
+.history-tracker-bottom-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-tracker-unit {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.history-tracker-unit-lbl {
+  font-size: 0.7rem;
+  color: #486b78;
+  font-weight: 600;
+}
+
+.history-tracker-unit-val {
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.96rem;
+  font-weight: 800;
+}
+
+.history-tracker-unit-val.initial {
+  color: #486b78;
+  text-decoration: line-through;
+}
+
+.history-tracker-unit-val.current {
+  color: #1e292d;
+}
+
+.history-tracker-arrow {
+  color: #346c80;
+}
+
+/* Sağ Sütun: Personel & İşlem Kütüğü (Dikey istiflenmiş, asla taşmaz) */
+.history-entity-card-right {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-left: 1.5px solid #b6ced6;
+  padding-left: 14px;
+  flex-shrink: 0;
+  min-width: 195px;
+}
+
+.history-stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.74rem;
+}
+
+.history-stat-label {
+  color: #486b78;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.history-stat-badge {
+  color: #1e292d;
+  font-weight: 800;
+  background: #d3e5eb;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid #b6ced6;
+  font-size: 0.72rem;
+}
+
+.history-stat-person {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #346c80;
+  font-weight: 700;
+  background: #ffffff;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid #b6ced6;
+  font-size: 0.72rem;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Filtre & Arama Barı */
+.history-filter-bar {
+  flex-shrink: 0;
+  padding: 12px 24px;
+  background: #ffffff;
+  border-bottom: 1.5px solid #cce2e9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.history-search-input-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #dbe9ee;
+  border: 1px solid #b6ced6;
+  border-radius: 10px;
+  padding: 8px 14px;
+  width: 290px;
+  flex-shrink: 0;
+}
+
+.history-search-input-box input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.84rem;
+  color: #1e292d;
+  width: 100%;
+  font-family: inherit;
+}
+
+.history-search-clear {
+  border: none;
+  background: transparent;
+  color: #5d818f;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 0;
+}
+
+.history-filter-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.history-filter-pill {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid #b6ced6;
+  background: #ffffff;
+  color: #346c80;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.history-filter-pill:hover {
+  background: #d3e5eb;
+}
+
+.history-filter-pill.active {
+  background: #346c80;
+  color: #ffffff;
+  border-color: #346c80;
+  box-shadow: 0 2px 6px rgba(52, 108, 128, 0.2);
+}
+
+/* Zaman Çizelgesi Alanı - Sabit modal içinde esnek ve tam ortalanmış */
+.history-timeline-scroll-area {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 20px 24px !important;
+  background: #ffffff !important;
+  display: flex !important;
+  flex-direction: column !important;
+  box-sizing: border-box !important;
+}
+
+.history-timeline-scroll-area::-webkit-scrollbar {
+  width: 6px;
+}
+
+.history-timeline-scroll-area::-webkit-scrollbar-track {
+  background: #f8fbfc;
+}
+
+.history-timeline-scroll-area::-webkit-scrollbar-thumb {
+  background: #b6ced6;
+  border-radius: 4px;
+}
+
+.history-timeline-scroll-area::-webkit-scrollbar-thumb:hover {
+  background: #cbb49e;
+}
+
+.history-empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px 20px;
+}
+
+/* Kompakt ve Yüksek Yoğunluklu Zaman Çizelgesi */
+.history-rich-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px; /* Kompakt ve ergonomik aralık */
+  position: relative;
+}
+
+.history-compact-item {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  position: relative;
+}
+
+.history-compact-track {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 14px;
+  flex-shrink: 0;
+}
+
+.history-compact-node {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1.5px rgba(52, 108, 128, 0.2);
+  margin-top: 13px;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.history-compact-stem {
+  width: 1.5px;
+  background: #b6ced6;
+  flex: 1;
+  margin-top: 2px;
+}
+
+.history-compact-item:last-child .history-compact-stem {
+  display: none;
+}
+
+.history-compact-card {
+  flex: 1;
+  background: #ffffff;
+  border: 1px solid #b6ced6;
+  border-radius: 10px;
+  padding: 8px 14px;
+  box-shadow: 0 1px 4px rgba(27, 65, 79, 0.03);
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-sizing: border-box;
+}
+
+.history-compact-card:hover {
+  border-color: #cbb49e;
+  box-shadow: 0 3px 10px rgba(27, 65, 79, 0.07);
+  background: #f8fbfc;
+}
+
+.history-compact-main-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.history-compact-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 220px;
+  flex-wrap: wrap;
+}
+
+.history-compact-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+}
+
+.history-compact-price-diff {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #dbe9ee;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid #b6ced6;
+}
+
+.history-price-old {
+  font-size: 0.82rem;
+  color: #486b78;
+  text-decoration: line-through;
+  font-family: 'Outfit', sans-serif;
+}
+
+.history-price-arrow {
+  color: #346c80;
+}
+
+.history-price-new {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #1e292d;
+  font-family: 'Outfit', sans-serif;
+}
+
+.history-price-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-left: 2px;
+}
+
+.history-price-delta.up {
+  background: #eaf6ed;
+  color: #1e7e34;
+  border: 1px solid #b8e2c3;
+}
+
+.history-price-delta.down {
+  background: #fdf2f2;
+  color: #b84a39;
+  border: 1px solid #f7c5c0;
+}
+
+.history-compact-text {
+  font-size: 0.82rem;
+  color: #3f332c;
+  font-weight: 600;
+}
+
+.history-compact-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.history-compact-user {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.history-compact-avatar {
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: #346c80;
+  color: #ffffff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.history-compact-username {
+  font-size: 0.78rem;
+  color: #334951;
+  font-weight: 700;
+}
+
+.history-compact-time {
+  font-size: 0.73rem;
+  color: #486b78;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: #dbe9ee;
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid #b6ced6;
+  white-space: nowrap;
+}
+
+.history-compact-extra {
+  font-size: 0.76rem;
+  color: #6d5b4f;
+  background: #dbe9ee;
+  border-left: 2.5px solid #346c80;
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-top: 2px;
+}
+
+/* Modal Footer */
+.history-modal-footer {
+  flex-shrink: 0 !important;
+  padding: 14px 22px;
+  border-top: 1px solid #b6ced6;
+  background: #f8fbfc;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom-left-radius: 20px;
+  border-bottom-right-radius: 20px;
+  box-sizing: border-box;
+}
+
+.history-footer-summary {
+  font-size: 0.82rem;
+  color: #486b78;
+}

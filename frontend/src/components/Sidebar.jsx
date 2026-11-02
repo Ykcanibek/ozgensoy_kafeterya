@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { pagePermissions } from '../lib/pages';
 import { 
   Coffee, 
   X, 
@@ -11,23 +12,29 @@ import {
   Tags,
   Package,
   Users,
-  ShieldCheck
+  ShieldCheck,
+  UserCheck,
+  PackageX,
+  BookOpen
 } from 'lucide-react';
 
 export default function Sidebar({ isOpen, onClose }) {
-  const { logout } = useAuth();
+  const { logout, canAny } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const menuItems = [
     { path: '/pos', label: 'Masalar & POS', icon: <LayoutGrid size={18} /> },
     { path: '/musteriler', label: 'Müşteriler & Cari', icon: <Users size={18} /> },
+    { path: '/kasa-defteri', label: 'Kasa Defteri', icon: <BookOpen size={18} /> },
     { path: '/kategoriler', label: 'Kategori Yönetimi', icon: <Tags size={18} /> },
     { path: '/urunler', label: 'Ürün Yönetimi', icon: <Package size={18} /> },
     { path: '/mutfak', label: 'Mutfak Ekranı', icon: <ChefHat size={18} /> },
+    { path: '/fire-zayi', label: 'Fire & Zayi', icon: <PackageX size={18} /> },
     { path: '/raporlar', label: 'Gün Sonu & Raporlar', icon: <BarChart3 size={18} /> },
+    { path: '/personel', label: 'Personel Yönetimi', icon: <UserCheck size={18} /> },
     { path: '/yetkiler', label: 'Yetki & Rol Yönetimi', icon: <ShieldCheck size={18} /> },
-  ];
+  ].filter(item => canAny(pagePermissions(item.path))); // Yalnızca yetkili olunan sayfalar
 
   if (!isOpen) return null;
 
@@ -56,7 +63,8 @@ export default function Sidebar({ isOpen, onClose }) {
         position: 'fixed',
         top: 0,
         left: 0,
-        bottom: 0,
+        // Telefonda adres çubuğu açıkken de alt kısım (Oturumu Kapat) görünür kalsın
+        height: '100dvh',
         width: '335px',
         maxWidth: '88vw',
         background: '#ffffff',
@@ -76,8 +84,8 @@ export default function Sidebar({ isOpen, onClose }) {
           }
         `}</style>
 
-        {/* Üst Kısım: Kafe Logosu ve Kapat Düğmesi */}
-        <div>
+        {/* Üst Kısım: Kafe Logosu, Kapat Düğmesi ve (sığmazsa kendi içinde kayan) menü listesi */}
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -85,7 +93,8 @@ export default function Sidebar({ isOpen, onClose }) {
             gap: '12px',
             paddingBottom: '14px',
             borderBottom: '1.5px solid #b6ced6',
-            marginBottom: '16px'
+            marginBottom: '12px',
+            flexShrink: 0
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0 }}>
               <div style={{
@@ -147,7 +156,17 @@ export default function Sidebar({ isOpen, onClose }) {
           </div>
 
           {/* Menü Linkleri (Kompakt ve Açıklamasız) */}
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <nav style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+            flex: 1,
+            minHeight: 0,
+            overflowY: 'auto',
+            overscrollBehavior: 'contain',
+            margin: '0 -6px',
+            padding: '0 6px 4px'
+          }}>
             {menuItems.map((item) => {
               const isActive = location.pathname === item.path || (item.path === '/pos' && location.pathname === '/');
               return (
@@ -158,9 +177,10 @@ export default function Sidebar({ isOpen, onClose }) {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '12px',
-                    padding: '9px 12px',
+                    padding: '8px 12px',
                     borderRadius: '12px',
                     border: '1px solid',
+                    flexShrink: 0,
                     borderColor: isActive ? '#346c80' : 'transparent',
                     background: isActive ? '#f8f3ed' : 'transparent',
                     color: isActive ? '#346c80' : '#334951',
@@ -201,7 +221,9 @@ export default function Sidebar({ isOpen, onClose }) {
         {/* Alt Kısım: Sadece Oturumu Kapat */}
         <div style={{
           borderTop: '1px solid #f3ebe3',
-          paddingTop: '14px'
+          paddingTop: '12px',
+          marginTop: '8px',
+          flexShrink: 0
         }}>
           <button
             onClick={() => {

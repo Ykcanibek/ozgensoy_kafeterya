@@ -1,0 +1,3 @@
+# Sunucu (Linux) betikleri Windows satır sonlarıyla bozulmasın
+*.sh text eol=lf
+deploy/nginx.conf text eol=lf

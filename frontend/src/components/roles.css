@@ -3,9 +3,9 @@
    ======================================================== */
 
 .roles-container {
-  max-width: 1380px;
-  margin: 0 auto;
-  padding: 24px 20px 48px;
+  /* Diğer sayfalar gibi tam genişlik: büyük ekranlarda kenarlarda boşluk kalmasın */
+  width: 100%;
+  padding: 24px 0 48px;
   animation: rolesFadeIn 0.22s ease;
 }
 
@@ -873,4 +873,216 @@
   .roles-stats-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Kilitli (tam yetkili) rol rozeti */
+.role-badge-tag.locked {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+/* Rol kartında indirim limiti rozeti */
+.role-card-limit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: #7e22ce;
+  background: #f3e8ff;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+/* Rolü kopyala butonu */
+.role-btn-icon-copy {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1.5px solid #d3e3e8;
+  background: #f4f9fa;
+  color: #346c80;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  flex-shrink: 0;
+}
+.role-btn-icon-copy:hover {
+  background: #346c80;
+  color: #ffffff;
+  border-color: #346c80;
+}
+
+/* Yönetici rolü kilit bildirimi */
+.roles-lock-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+  background: #fffbeb;
+  border: 1.5px solid #fcd34d;
+  color: #92400e;
+}
+.roles-lock-banner svg { flex-shrink: 0; margin-top: 2px; }
+.roles-lock-banner div { display: flex; flex-direction: column; gap: 2px; font-size: 0.82rem; line-height: 1.4; }
+.roles-lock-banner strong { font-size: 0.88rem; }
+
+/* Kritik yetki sayacı */
+.roles-risk-counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: #b91c1c;
+  background: #fee2e2;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+/* Yetki arama kutusu */
+.roles-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 220px;
+  max-width: 340px;
+  padding: 6px 10px;
+  border-radius: 9px;
+  border: 1.5px solid #d3e3e8;
+  background: #ffffff;
+  color: #64748b;
+}
+.roles-search-box:focus-within { border-color: #346c80; }
+.roles-search-box input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: 0.84rem;
+  color: #173845;
+  background: transparent;
+}
+.roles-search-box button {
+  border: none;
+  background: none;
+  color: #94a3b8;
+  cursor: pointer;
+  display: inline-flex;
+  padding: 0;
+}
+.roles-search-empty {
+  text-align: center;
+  padding: 28px 16px;
+  color: #64748b;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+/* Yetki kartı: rozetler, açıklama ve bağımlılık */
+.role-perm-badges {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.role-perm-risk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  background: #b91c1c;
+  color: #ffffff;
+}
+.role-perm-desc {
+  font-size: 0.74rem;
+  color: #64748b;
+  line-height: 1.35;
+}
+.role-perm-requires {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #346c80;
+}
+.role-perm-item.locked {
+  cursor: default;
+}
+.role-perm-item.locked:hover {
+  transform: none;
+}
+
+/* İndirim üst sınırı */
+.role-limit-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 0 18px 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #faf5ff;
+  border: 1.5px dashed #d8b4fe;
+}
+.role-limit-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: #6b21a8;
+  flex: 1 1 260px;
+}
+.role-limit-text svg { flex-shrink: 0; margin-top: 2px; }
+.role-limit-text div { display: flex; flex-direction: column; gap: 2px; }
+.role-limit-text strong { font-size: 0.86rem; }
+.role-limit-text span { font-size: 0.76rem; color: #7e22ce; line-height: 1.35; }
+.role-limit-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  border: 1.5px solid #d8b4fe;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-weight: 800;
+  color: #7e22ce;
+}
+.role-limit-input input {
+  width: 80px;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #173845;
+  background: transparent;
+}
+
+/* Kaydedilmemiş değişiklik uyarısı */
+.roles-unsaved-hint {
+  margin-right: auto;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #b45309;
+}
+
+@media (max-width: 640px) {
+  .roles-search-box { max-width: none; flex-basis: 100%; }
+  .roles-unsaved-hint { flex-basis: 100%; margin-right: 0; }
+  .roles-modal-footer { flex-wrap: wrap; }
 }

@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useToast } from './ui/ToastProvider';
+import { apiFetch } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Navbar from './Navbar';
@@ -63,7 +65,7 @@ export const formatLeadingZeroPhone = (val) => {
 };
 
 export default function Customers() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const navigate = useNavigate();
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -105,19 +107,7 @@ export default function Customers() {
   const [isSubmittingForm, setIsSubmittingForm] = useState(false);
   const [formError, setFormError] = useState('');
 
-  // Özel Ekrana Özel Toast Bildirimi State
-  const [toast, setToast] = useState(null);
-  const toastTimerRef = useRef(null);
-
-  const showToast = (message, type = 'success', duration = 3800) => {
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-    }
-    setToast({ message, type, id: Date.now() });
-    toastTimerRef.current = setTimeout(() => {
-      setToast(null);
-    }, duration);
-  };
+  const { showToast } = useToast(); // Global bildirimler (üst ortada, türe göre)
 
   // Müşteri Arşive Alma / Silme Onay Modalı State
   const [customerToDelete, setCustomerToDelete] = useState(null);
@@ -128,20 +118,11 @@ export default function Customers() {
   const [resetDebtNotes, setResetDebtNotes] = useState('');
   const [isSubmittingResetDebt, setIsSubmittingResetDebt] = useState(false);
 
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    };
-  }, []);
-
   // Müşterileri Çek
   const fetchCustomers = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('kafe_token');
-      const res = await fetch(`/api/customers?search=${encodeURIComponent(searchQuery)}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
-      });
+      const res = await apiFetch(`/api/customers?search=${encodeURIComponent(searchQuery)}`);
       const data = await res.json();
       if (data.success) {
         setCustomers(data.customers || []);
@@ -166,10 +147,7 @@ export default function Customers() {
     if (!id) return;
     try {
       setDetailLoading(true);
-      const token = localStorage.getItem('kafe_token');
-      const res = await fetch(`/api/customers/${id}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
-      });
+      const res = await apiFetch(`/api/customers/${id}`);
       const data = await res.json();
       if (data.success) {
         setCustomerDetail(data);
@@ -251,16 +229,12 @@ export default function Customers() {
     try {
       setIsSubmittingForm(true);
       setFormError('');
-      const token = localStorage.getItem('kafe_token');
       const url = editingCustomer ? `/api/customers/${editingCustomer.id}` : '/api/customers';
       const method = editingCustomer ? 'PUT' : 'POST';
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: formName.trim(),
           phone: formPhone,
@@ -309,10 +283,8 @@ export default function Customers() {
 
     try {
       setIsDeletingCustomer(true);
-      const token = localStorage.getItem('kafe_token');
-      const res = await fetch(`/api/customers/${customerToDelete.id}`, {
-        method: 'DELETE',
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      const res = await apiFetch(`/api/customers/${customerToDelete.id}`, {
+        method: 'DELETE'
       });
       const data = await res.json();
       if (data.success) {
@@ -347,13 +319,9 @@ export default function Customers() {
 
     try {
       setIsSubmittingResetDebt(true);
-      const token = localStorage.getItem('kafe_token');
-      const res = await fetch(`/api/customers/${selectedCustomer.id}/reset-debt`, {
+      const res = await apiFetch(`/api/customers/${selectedCustomer.id}/reset-debt`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           notes: resetDebtNotes.trim()
         })
@@ -369,7 +337,6 @@ export default function Customers() {
         setMixedCash('0');
         setMixedCard('0.00');
         setDiscountVal('');
-        setTipVal('');
         setPayNotes('');
         setResetDebtNotes('');
         setShowResetDebtDialog(false);
@@ -434,13 +401,9 @@ export default function Customers() {
 
     try {
       setIsSubmittingPay(true);
-      const token = localStorage.getItem('kafe_token');
-      const res = await fetch(`/api/customers/${selectedCustomer.id}/payments`, {
+      const res = await apiFetch(`/api/customers/${selectedCustomer.id}/payments`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           settle_amount: parsedSettle,
           amount: netPayable,
@@ -502,45 +465,6 @@ export default function Customers() {
 
   return (
     <div className="pos-page-container">
-      {/* Özel Ekrana Özel Toast Bildirimi */}
-      {toast && (
-        <aside className="cust-toast-viewport" aria-live="assertive">
-          <div className={`cust-toast-card ${toast.type || 'info'}`}>
-            <div className="cust-toast-icon-badge">
-              {toast.type === 'success' && <CheckCircle2 size={18} />}
-              {toast.type === 'danger' && <AlertCircle size={18} />}
-              {toast.type === 'warning' && <AlertTriangle size={18} />}
-              {toast.type === 'info' && <Info size={18} />}
-            </div>
-
-            <div className="cust-toast-body">
-              <span className="cust-toast-title">
-                {toast.type === 'success' && 'Başarılı'}
-                {toast.type === 'danger' && 'İşlem Başarısız'}
-                {toast.type === 'warning' && 'Dikkat'}
-                {toast.type === 'info' && 'Bilgilendirme'}
-              </span>
-              <p className="cust-toast-msg">{toast.message}</p>
-            </div>
-
-            <button
-              type="button"
-              className="cust-toast-close-btn"
-              onClick={() => {
-                if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-                setToast(null);
-              }}
-              title="Kapat"
-            >
-              <X size={15} />
-            </button>
-
-            <div className="cust-toast-progress">
-              <div className="cust-toast-progress-fill" />
-            </div>
-          </div>
-        </aside>
-      )}
 
       {/* Yan Menü (Sidebar) */}
       <Sidebar 
@@ -567,6 +491,7 @@ export default function Customers() {
           </>
         }
         actions={
+          can('customers.create') && (
           <button
             type="button"
             onClick={handleOpenAddModal}
@@ -588,6 +513,7 @@ export default function Customers() {
             <UserPlus size={16} />
             <span>Yeni Müşteri Ekle</span>
           </button>
+          )
         }
       />
 
@@ -659,6 +585,7 @@ export default function Customers() {
               ? 'Arama kriterlerinize uygun müşteri kaydı bulunamadı.'
               : 'Henüz sistemde kayıtlı bir müşteri bulunmuyor.'}
           </p>
+          {can('customers.create') && (
           <button
             type="button"
             className="customers-btn-primary"
@@ -667,6 +594,7 @@ export default function Customers() {
             <UserPlus size={16} />
             <span>İlk Müşteriyi Ekle</span>
           </button>
+          )}
         </div>
       ) : (
         <div className="cust-table-card">
@@ -764,6 +692,7 @@ export default function Customers() {
                             <span>Hesap & Tahsilat</span>
                           </button>
 
+                          {can('customers.edit') && (
                           <button
                             type="button"
                             className="cust-row-icon-btn"
@@ -772,7 +701,9 @@ export default function Customers() {
                           >
                             <Edit2 size={14} />
                           </button>
+                          )}
 
+                          {can('customers.delete') && (
                           <button
                             type="button"
                             className="cust-row-icon-btn danger"
@@ -781,6 +712,7 @@ export default function Customers() {
                           >
                             <Trash2 size={14} />
                           </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -851,6 +783,7 @@ export default function Customers() {
                     </button>
 
                     <div className="cust-mcard-icons">
+                      {can('customers.edit') && (
                       <button
                         type="button"
                         className="cust-row-icon-btn"
@@ -859,6 +792,8 @@ export default function Customers() {
                       >
                         <Edit2 size={15} />
                       </button>
+                      )}
+                      {can('customers.delete') && (
                       <button
                         type="button"
                         className="cust-row-icon-btn danger"
@@ -867,6 +802,7 @@ export default function Customers() {
                       >
                         <Trash2 size={15} />
                       </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1287,6 +1223,7 @@ export default function Customers() {
                 <div className="cust-col-header right-actions">
                   {parseFloat(selectedCustomer.current_balance || 0) > 0.05 ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {can('customers.debt_reset') && (
                       <button
                         type="button"
                         className="cust-btn-reset-debt"
@@ -1296,7 +1233,9 @@ export default function Customers() {
                         <RotateCcw size={13} />
                         <span>Borcu Sıfırla</span>
                       </button>
+                      )}
 
+                      {can('customers.collect') && (
                       <button
                         type="button"
                         className="cust-btn-full-pay"
@@ -1313,6 +1252,7 @@ export default function Customers() {
                       >
                         Tümünü Kapat (₺{parseFloat(selectedCustomer.current_balance || 0).toFixed(2)})
                       </button>
+                      )}
                     </div>
                   ) : (
                     <div style={{ fontSize: '0.78rem', color: '#1e7e34', fontWeight: '700' }}>
@@ -1509,6 +1449,7 @@ export default function Customers() {
                           </div>
 
                           {/* Tahsilatı Onayla Butonu */}
+                          {can('customers.collect') && (
                           <button
                             type="submit"
                             className="customers-btn-pay-submit"
@@ -1531,6 +1472,7 @@ export default function Customers() {
                               </>
                             )}
                           </button>
+                          )}
                         </>
                       );
                     })()}

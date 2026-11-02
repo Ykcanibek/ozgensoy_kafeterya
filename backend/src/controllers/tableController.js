@@ -1,4 +1,9 @@
+import crypto from 'crypto';
 import { pool } from '../config/db.js';
+import { can, deny } from '../middleware/auth.js';
+import { getUserFromReq, logActivity } from '../config/auditLogger.js';
+
+const TABLE_STATUSES = ['empty', 'occupied', 'bill_requested'];
 
 // Tüm aktif masaları ve açık sipariş tutarlarını getir
 export const getTables = async (req, res) => {
@@ -27,7 +32,12 @@ export const getTables = async (req, res) => {
           SELECT MIN(o.created_at)
           FROM orders o
           WHERE o.table_id = t.id AND o.status NOT IN ('completed', 'cancelled')
-        ) as opened_at
+        ) as opened_at,
+        (
+          SELECT COUNT(q.id)
+          FROM qr_order_requests q
+          WHERE q.table_id = t.id AND q.status = 'pending'
+        ) as pending_qr_count
       FROM restaurant_tables t
       WHERE t.is_active = TRUE
       ORDER BY t.order_num ASC, t.id ASC
@@ -55,7 +65,8 @@ export const createTable = async (req, res) => {
     const nextOrder = maxOrder[0].next_order;
 
     const generatedTableNumber = table_number?.trim() || `M-${Date.now().toString().slice(-4)}`;
-    const qrToken = `qr_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    // QR menü anahtarı tahmin edilemez olmalı (masaya özel QR bağlantısı bu anahtarla açılır)
+    const qrToken = crypto.randomBytes(16).toString('base64url');
 
     const [result] = await pool.query(
       'INSERT INTO restaurant_tables (table_number, title, status, qr_code_token, order_num, is_active) VALUES (?, ?, "empty", ?, ?, TRUE)',
@@ -74,7 +85,7 @@ export const createTable = async (req, res) => {
     };
 
     if (req.io) {
-      req.io.emit('table_created', newTable);
+      req.io.emit('table:created', newTable);
     }
 
     res.status(201).json({ success: true, message: 'Masa başarıyla eklendi.', table: newTable });
@@ -89,49 +100,103 @@ export const createTable = async (req, res) => {
 
 // Masa güncelle (başlık veya durum)
 export const updateTable = async (req, res) => {
+  const connection = await pool.getConnection();
   try {
     const { id } = req.params;
     const { title, status } = req.body;
 
-    const [existing] = await pool.query('SELECT * FROM restaurant_tables WHERE id = ? AND is_active = TRUE', [id]);
+    if (status !== undefined && !TABLE_STATUSES.includes(status)) {
+      return res.status(400).json({ success: false, message: 'Geçersiz masa durumu.' });
+    }
+    if (title !== undefined && (typeof title !== 'string' || !title.trim())) {
+      return res.status(400).json({ success: false, message: 'Masa adı boş olamaz.' });
+    }
+
+    // Masa ve açık adisyonları tek işlemde güncellenir: yarıda kalan bir hata masa ile adisyonu tutarsız bırakmasın
+    await connection.beginTransaction();
+
+    const [existing] = await connection.query('SELECT * FROM restaurant_tables WHERE id = ? AND is_active = TRUE FOR UPDATE', [id]);
     if (existing.length === 0) {
+      await connection.rollback();
       return res.status(404).json({ success: false, message: 'Masa bulunamadı.' });
     }
 
     const updatedTitle = title !== undefined ? title.trim() : existing[0].title;
     const updatedStatus = status !== undefined ? status : existing[0].status;
 
-    await pool.query(
-      'UPDATE restaurant_tables SET title = ?, status = ? WHERE id = ?',
-      [updatedTitle, updatedStatus, id]
+    // Ad değişikliği masa düzenleme, masayı boşaltma ise ödemesiz kapatma yetkisi ister
+    if (updatedTitle !== existing[0].title && !can(req.user, 'tables.edit')) {
+      await connection.rollback();
+      return deny(res, 'tables.edit');
+    }
+    if (updatedStatus === 'empty' && existing[0].status !== 'empty' && !can(req.user, 'pos.close_empty')) {
+      await connection.rollback();
+      return deny(res, 'pos.close_empty');
+    }
+
+    // Masa elle boşaltılırsa QR menüdeki "masanın siparişleri" listesi de sıfırlanır
+    await connection.query(
+      `UPDATE restaurant_tables
+       SET qr_reset_at = IF(? = 'empty' AND status <> 'empty', NOW(), qr_reset_at), title = ?, status = ?
+       WHERE id = ?`,
+      [updatedStatus, updatedTitle, updatedStatus, id]
     );
 
+    let unpaidClosed = 0;
     if (updatedStatus === 'empty') {
-      const [activeOrders] = await pool.query(
-        "SELECT id FROM orders WHERE table_id = ? AND status NOT IN ('completed', 'cancelled')",
+      const [activeOrders] = await connection.query(
+        "SELECT id FROM orders WHERE table_id = ? AND status NOT IN ('completed', 'cancelled') FOR UPDATE",
         [id]
       );
       for (const ord of activeOrders) {
-        const [items] = await pool.query(
-          "SELECT id, is_paid, item_status FROM order_items WHERE order_id = ?",
+        const [items] = await connection.query(
+          "SELECT id, is_paid, item_status, total_price FROM order_items WHERE order_id = ?",
           [ord.id]
         );
         const hasValidConsumption = items.some(i => i.is_paid || i.item_status === 'complimentary' || i.item_status === 'delivered');
         const finalStatus = hasValidConsumption ? 'completed' : 'cancelled';
-        await pool.query("UPDATE orders SET status = ?, total_price = 0.00 WHERE id = ?", [finalStatus, ord.id]);
+        // Ödenmeden kapatılan (faturalanabilir, ödenmemiş) tutar: işlem günlüğüne yazılır
+        unpaidClosed += items
+          .filter(i => !i.is_paid && !['cancelled', 'returned', 'complimentary'].includes(i.item_status))
+          .reduce((s, i) => s + parseFloat(i.total_price || 0), 0);
+        await connection.query("UPDATE orders SET status = ?, total_price = 0.00, closed_at = NOW() WHERE id = ?", [finalStatus, ord.id]);
       }
     }
 
+    await connection.commit();
+
+    if (unpaidClosed > 0.005) {
+      const user = getUserFromReq(req);
+      await logActivity({
+        userId: user.id,
+        userName: user.name,
+        entityType: 'table',
+        entityId: parseInt(id, 10),
+        actionType: 'table_closed_unpaid',
+        title: `Masa Ödemesiz Kapatıldı: ${updatedTitle} (₺${unpaidClosed.toFixed(2)})`,
+        details: `${user.name} tarafından masa, ₺${unpaidClosed.toFixed(2)} tutarındaki ödenmemiş ürünlerle birlikte tahsilat alınmadan boşaltıldı.`,
+        amount: unpaidClosed,
+        tableTitle: updatedTitle
+      });
+    }
+
     if (req.io) {
-      req.io.emit('table_updated', { id: parseInt(id), title: updatedTitle, status: updatedStatus });
-      req.io.emit('table:updated', { tableId: parseInt(id), status: updatedStatus, active_total: 0.00 });
+      req.io.emit('table:updated', {
+        tableId: parseInt(id),
+        title: updatedTitle,
+        status: updatedStatus,
+        ...(updatedStatus === 'empty' ? { active_total: 0.00 } : {})
+      });
       req.io.emit('order:updated', { tableId: parseInt(id) });
     }
 
     res.json({ success: true, message: 'Masa güncellendi.' });
   } catch (error) {
+    await connection.rollback().catch(() => {});
     console.error('Masa güncelleme hatası:', error);
     res.status(500).json({ success: false, message: 'Masa güncellenemedi: ' + error.message });
+  } finally {
+    connection.release();
   }
 };
 
@@ -157,7 +222,7 @@ export const deleteTable = async (req, res) => {
     await pool.query('UPDATE restaurant_tables SET is_active = FALSE WHERE id = ?', [id]);
 
     if (req.io) {
-      req.io.emit('table_deleted', { id: parseInt(id) });
+      req.io.emit('table:deleted', { id: parseInt(id) });
     }
 
     res.json({ success: true, message: 'Masa başarıyla kaldırıldı (geçmiş siparişleri korundu).' });
@@ -184,7 +249,7 @@ export const reorderTables = async (req, res) => {
     await Promise.all(updatePromises);
 
     if (req.io) {
-      req.io.emit('tables_reordered', tableIds);
+      req.io.emit('tables:reordered', tableIds);
     }
 
     res.json({ success: true, message: 'Masa sıralaması başarıyla kaydedildi.' });
