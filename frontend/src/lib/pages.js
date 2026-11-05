@@ -10,7 +10,8 @@ export const PAGES = [
   { path: '/fire-zayi', label: 'Fire & Zayi', permissions: ['waste.view'] },
   { path: '/raporlar', label: 'Gün Sonu & Raporlar', permissions: ['reports.view'] },
   { path: '/personel', label: 'Personel Yönetimi', permissions: ['staff.view'] },
-  { path: '/yetkiler', label: 'Yetki & Rol Yönetimi', permissions: ['roles.view'] }
+  { path: '/yetkiler', label: 'Yetki & Rol Yönetimi', permissions: ['roles.view'] },
+  { path: '/yedekler', label: 'Yedekler', permissions: ['reports.backup'] }
 ];
 
 export const pagePermissions = (path) => PAGES.find(p => p.path === path)?.permissions || [];

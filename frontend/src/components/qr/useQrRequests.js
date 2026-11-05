@@ -21,6 +21,7 @@ export default function useQrRequests({ tableId = null, enabled = true, onNew } 
     if (!enabled) return undefined;
     reload();
     const socket = createSocket();
+    socket.on('resync', reload);
     socket.on('qr:request', (payload) => {
       if (tableId && Number(payload?.tableId) !== Number(tableId)) return;
       reload();

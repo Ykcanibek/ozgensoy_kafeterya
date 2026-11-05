@@ -96,6 +96,8 @@ export default function Categories() {
 
     const socket = createSocket();
 
+    socket.on('resync', () => fetchCategories());
+
     socket.on('category:created', (newCat) => {
       setCategories(prev => {
         if (prev.some(c => c.id === newCat.id)) return prev;

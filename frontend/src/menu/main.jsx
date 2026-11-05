@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import MenuApp from './MenuApp';
+import '../styles/fonts-menu.css';
 import './menu.css';
 
 // Adres: /m/<masa-anahtarı>  (masaya özel QR kodu bu adresi açar)

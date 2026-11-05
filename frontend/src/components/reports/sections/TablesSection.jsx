@@ -19,7 +19,7 @@ export default function TablesSection({ data, fileLabel }) {
   const exportCsv = () => downloadCsv(`masa-performansi-${fileLabel}`, [
     { label: 'Masa', value: r => r.title },
     { label: 'Adisyon', value: r => r.orders },
-    { label: 'Net satış (TL)', value: r => r.net },
+    { label: 'Net ciro (TL)', value: r => r.net },
     { label: 'Pay (%)', value: r => r.share },
     { label: 'Ortalama adisyon (TL)', value: r => r.average_ticket },
     { label: 'Ürün / adisyon', value: r => r.items_per_ticket },
@@ -40,7 +40,7 @@ export default function TablesSection({ data, fileLabel }) {
 
       {used.length === 0 ? <Card><Empty>Bu dönemde masada kapanan adisyon yok.</Empty></Card> : (
         <div className="rh-grid-1-2">
-          <Card title="Ciro sıralaması" subtitle="Net satış">
+          <Card title="Ciro sıralaması" subtitle="Net ciro">
             <div className="rh-scroll">
               {used.map((t, i) => <BarRow key={t.table_id} label={<><b className="rh-rank">{i + 1}</b>{t.title}</>} value={t.net} max={max} extra={`${num(t.orders)} ad.`} />)}
             </div>
@@ -52,7 +52,7 @@ export default function TablesSection({ data, fileLabel }) {
                   <tr>
                     <SortTh id="title" sort={sort} setSort={setSort}>Masa</SortTh>
                     <SortTh id="orders" sort={sort} setSort={setSort} num>Adisyon</SortTh>
-                    <SortTh id="net" sort={sort} setSort={setSort} num>Net satış</SortTh>
+                    <SortTh id="net" sort={sort} setSort={setSort} num>Net ciro</SortTh>
                     <SortTh id="average_ticket" sort={sort} setSort={setSort} num>Ort. adisyon</SortTh>
                     <SortTh id="items_per_ticket" sort={sort} setSort={setSort} num>Ürün/adisyon</SortTh>
                     <SortTh id="avg_duration_min" sort={sort} setSort={setSort} num>Ort. süre</SortTh>

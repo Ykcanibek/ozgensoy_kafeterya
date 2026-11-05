@@ -53,12 +53,59 @@ export const apiFetch = async (url, options = {}) => {
 // (oturum süresi doldu / hesap pasife alındı) yenilenmiş token ile tekrar bağlanılır.
 let sharedSocket = null;
 let sharedUsers = 0;
+let connectionLost = false;
+const resyncHandlers = new Set();
+const connectionListeners = new Set();
+const RESYNC_AFTER_HIDDEN_MS = 30 * 1000;
+
+const setConnectionLost = (lost) => {
+  if (connectionLost === lost) return; // Her yeniden deneme bildirilirse uyarının bekleme süresi hep başa döner
+  connectionLost = lost;
+  connectionListeners.forEach(listener => listener(lost));
+};
+const runResync = () => resyncHandlers.forEach(handler => handler());
+
+/** Bağlantı durumunu izler (true: koptu); hemen mevcut durumla çağrılır, aboneliği kaldıran işlev döner */
+export const subscribeConnection = (listener) => {
+  connectionListeners.add(listener);
+  listener(connectionLost);
+  return () => connectionListeners.delete(listener);
+};
+
+// Tablet uykudan dönünce: kopan bağlantı hemen denensin; uzun süre gizli kaldıysa ekranlar yenilensin
+let hiddenAt = null;
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    hiddenAt = Date.now();
+    return;
+  }
+  if (sharedSocket && !sharedSocket.connected && !sharedSocket.active && getToken()) sharedSocket.connect();
+  if (sharedSocket && hiddenAt && Date.now() - hiddenAt > RESYNC_AFTER_HIDDEN_MS) runResync();
+  hiddenAt = null;
+});
 
 const getSharedSocket = () => {
   if (!sharedSocket) {
     sharedSocket = io({ auth: (cb) => cb({ token: getToken() }) });
+    sharedSocket.on('connect', () => {
+      // Bağlantı yokken gelen olaylar kaçırıldı: açık ekranlar güncel hali sunucudan alır
+      if (connectionLost) {
+        setConnectionLost(false);
+        runResync();
+      }
+    });
     sharedSocket.on('disconnect', (reason) => {
+      if (reason === 'io client disconnect') return;
+      setConnectionLost(true);
       if (reason === 'io server disconnect' && getToken()) setTimeout(() => sharedSocket?.connect(), 2000);
+    });
+    sharedSocket.on('connect_error', (error) => {
+      if (!getToken()) return;
+      setConnectionLost(true);
+      // Oturum geçersizse (şifre değişti, süresi doldu) istek 401 alır ve giriş ekranına dönülür
+      if (error?.message === 'UNAUTHENTICATED') axios.get('/api/auth/me').catch(() => {});
+      // Sunucu bağlantıyı reddettiyse (ör. yeniden başlarken veritabanı hazır değildi) istemci kendiliğinden denemez
+      if (!sharedSocket?.active) setTimeout(() => sharedSocket?.connect(), 5000);
     });
   }
   return sharedSocket;
@@ -67,6 +114,7 @@ const getSharedSocket = () => {
 /**
  * Bileşene ortak bağlantı üzerinde kendi dinleyici grubunu verir.
  * disconnect() yalnızca bu bileşenin dinleyicilerini kaldırır; son kullanıcı ayrılınca bağlantı kapanır.
+ * 'resync' olayı sunucudan gelmez: bağlantı geri geldiğinde veya ekran uykudan döndüğünde çağrılır, veriyi yeniden çekmek içindir.
  */
 export const createSocket = () => {
   const socket = getSharedSocket();
@@ -75,18 +123,23 @@ export const createSocket = () => {
   let closed = false;
   return {
     on(event, handler) {
-      socket.on(event, handler);
+      if (event === 'resync') resyncHandlers.add(handler);
+      else socket.on(event, handler);
       handlers.push([event, handler]);
       return this;
     },
     disconnect() {
       if (closed) return;
       closed = true;
-      handlers.forEach(([event, handler]) => socket.off(event, handler));
+      handlers.forEach(([event, handler]) => {
+        if (event === 'resync') resyncHandlers.delete(handler);
+        else socket.off(event, handler);
+      });
       sharedUsers -= 1;
       if (sharedUsers === 0 && sharedSocket === socket) {
         socket.disconnect();
         sharedSocket = null;
+        setConnectionLost(false);
       }
     }
   };

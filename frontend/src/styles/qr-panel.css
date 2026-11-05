@@ -179,21 +179,33 @@
   color: #8a5300; font-size: 0.78rem; font-weight: 600; line-height: 1.5;
 }
 
-/* Masalar başlığında "QR sipariş: Açık / Kapalı" anahtarı (istatistik hapları boyutunda) */
+/* Masalar başlığındaki aç/kapa anahtarları (QR sipariş, otomatik fiş). Durum anında değişir, kayıt arkada yapılır;
+   düğmenin genişliği hiçbir durumda değişmez (yanındaki düğmeler kaymaz). */
 .qr-ordering-toggle {
+  --toggle-ease: cubic-bezier(0.4, 0, 0.2, 1);
   display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px 6px 11px; border-radius: 10px;
   font-family: inherit; font-size: 0.82rem; font-weight: 600; white-space: nowrap; cursor: pointer;
-  border: 1.5px solid; transition: background 0.15s, border-color 0.15s;
+  border: 1.5px solid; user-select: none; -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.25s var(--toggle-ease), border-color 0.25s var(--toggle-ease), color 0.25s var(--toggle-ease);
 }
 .qr-ordering-toggle strong { font-weight: 800; }
-.qr-ordering-toggle i { position: relative; width: 28px; height: 16px; border-radius: 999px; background: currentColor; opacity: 0.9; }
-.qr-ordering-toggle i::after {
-  content: ''; position: absolute; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: #ffffff;
-  transition: left 0.15s ease;
+.qr-ordering-toggle i {
+  position: relative; flex: none; width: 28px; height: 16px; border-radius: 999px; background-color: currentColor; opacity: 0.9;
+  transition: background-color 0.25s var(--toggle-ease);
 }
-.qr-ordering-toggle.on { background: #e7f3ec; border-color: #9fd0b2; color: #13804a; }
-.qr-ordering-toggle.on i::after { left: 14px; }
-.qr-ordering-toggle.off { background: #fdecea; border-color: #f0b4ad; color: #c0262d; }
-.qr-ordering-toggle.off i::after { left: 2px; }
-.qr-ordering-toggle:disabled { cursor: default; }
-.qr-ordering-toggle:disabled i { display: none; }
+.qr-ordering-toggle i::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  transition: transform 0.25s var(--toggle-ease);
+}
+.qr-ordering-toggle.on { background-color: #e7f3ec; border-color: #9fd0b2; color: #13804a; }
+.qr-ordering-toggle.on i::after { transform: translateX(12px); }
+.qr-ordering-toggle.off { background-color: #fdecea; border-color: #f0b4ad; color: #c0262d; }
+.qr-ordering-toggle:active:not(.readonly) i::after { width: 14px; }
+.qr-ordering-toggle.on:active:not(.readonly) i::after { transform: translateX(10px); }
+/* Değiştirme yetkisi yoksa yalnızca durum görünür */
+.qr-ordering-toggle.readonly { cursor: default; }
+.qr-ordering-toggle.readonly i { opacity: 0.45; }
+@media (prefers-reduced-motion: reduce) {
+  .qr-ordering-toggle, .qr-ordering-toggle i, .qr-ordering-toggle i::after { transition: none; }
+}

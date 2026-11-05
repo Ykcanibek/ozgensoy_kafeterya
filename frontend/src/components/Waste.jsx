@@ -288,6 +288,7 @@ export default function Waste() {
   // Başka bir cihazda kayıt eklenince/silinince listeyi yenile
   useEffect(() => {
     const socket = createSocket();
+    socket.on('resync', () => load());
     socket.on('waste:changed', () => load());
     return () => socket.disconnect();
   }, [load]);

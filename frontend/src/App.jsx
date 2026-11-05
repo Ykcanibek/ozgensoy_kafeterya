@@ -31,8 +31,10 @@ const Roles = lazy(() => import('./components/Roles'));
 const Staff = lazy(() => import('./components/Staff'));
 const Waste = lazy(() => import('./components/Waste'));
 const CashBook = lazy(() => import('./components/CashBook'));
+const Backups = lazy(() => import('./components/Backups'));
 import ErrorBoundary from './components/ui/ErrorBoundary';
 import QrNotifier from './components/qr/QrNotifier';
+import ConnectionBanner from './components/ui/ConnectionBanner';
 
 function LoadingScreen() {
   return (
@@ -136,7 +138,8 @@ const PROTECTED_PAGES = [
   ['/kasa-defteri', <CashBook />],
   ['/raporlar', <Reports />],
   ['/personel', <Staff />],
-  ['/yetkiler', <Roles />]
+  ['/yetkiler', <Roles />],
+  ['/yedekler', <Backups />]
 ];
 
 export default function App() {
@@ -146,6 +149,7 @@ export default function App() {
       <ConfirmProvider>
       <div className="cafe-ambient-bg"></div>
       <BrowserRouter>
+        <ConnectionBanner />
         <QrNotifier />
         <Routes>
           {/* Giriş Sayfası */}

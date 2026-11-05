@@ -21,14 +21,15 @@ const money = (n) => `₺${Number(n).toLocaleString('tr-TR', { minimumFractionDi
 const CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
 /*
- * Bahşiş personele aittir: kasaya girer ama işletme cirosu (geliri) değildir. Bu yüzden gün sonu cirosu ve
- * kasa defterine işlenen tutar bahşiş hariçtir; bahşiş raporda ayrıca gösterilir.
- * Ödeme başına bahşişin hangi hesaba girdiği: nakit ödemede nakit, kartlı ödemede kart; parçalı ödemede
- * önce nakit kısmından, kalan varsa kart kısmından düşülür. (Veresiyeye yazılan bahşiş kasaya girmediğinden dikkate alınmaz.)
+ * Bahşiş işletmeye kalır: kasaya giren paranın tamamı (bahşiş dahil) gün sonu cirosu olarak kasa defterine işlenir.
+ * Bahşiş personele dağıtılırsa kasa defterine gider olarak girilir (Personel Giderleri › Bahşiş Ödemesi).
+ * Raporlardaki net ciro da bahşişi içerir; sales.net yalnızca ürün satışıdır.
+ * Ödeme başına bahşişin hangi hesaba girdiği (rapordaki kırılım için): nakit ödemede nakit, kartlı ödemede kart;
+ * parçalı ödemede önce nakit kısmı, kalan varsa kart kısmı. (Veresiyeye yazılan bahşiş kasaya girmediğinden dikkate alınmaz.)
  */
-export const CASH_TIP_SQL = `CASE WHEN p.payment_method = 'cash' THEN p.tip
+const CASH_TIP_SQL = `CASE WHEN p.payment_method = 'cash' THEN p.tip
   WHEN p.payment_method = 'mixed' THEN LEAST(p.tip, p.cash_amount) ELSE 0 END`;
-export const CARD_TIP_SQL = `CASE WHEN p.payment_method = 'credit_card' THEN p.tip
+const CARD_TIP_SQL = `CASE WHEN p.payment_method = 'credit_card' THEN p.tip
   WHEN p.payment_method = 'mixed' THEN LEAST(GREATEST(p.tip - p.cash_amount, 0), p.card_amount) ELSE 0 END`;
 
 const fetchTipSplit = async (range) => {
@@ -64,9 +65,9 @@ export const buildDaySnapshot = async (date) => {
     // Kasa defterine işlenen ciro = kasaya giren − bahşiş (hesap bazında)
     tips,
     ledger: {
-      cash: round2(collections.cash - tips.cash),
-      card: round2(collections.card - tips.card),
-      total: round2(collections.drawer_total - tips.total)
+      cash: round2(collections.cash),
+      card: round2(collections.card),
+      total: round2(collections.drawer_total)
     },
     categories: [...catMap.values()].sort((a, b) => b.revenue - a.revenue),
     // Maliyet bilgisi saklanmaz (kasa defterini görenler maliyet yetkisine sahip olmayabilir)
@@ -123,9 +124,9 @@ export const closeDay = async (date, { userId = null, userName = 'Sistem (gün s
     const lines = [['cash', cash, cats.pos_daily_cash], ['card', card, cats.pos_daily_card]].filter(([, amount]) => amount > 0);
     const batchId = lines.length > 1 ? crypto.randomUUID() : null;
     const s = snap.sales;
-    const summary = `Gün sonu cirosu — ${s.order_count} adisyon, net satış ${money(s.net)}` +
+    const summary = `${trDate(date)} günlük ciro (otomatik kayıt) — ${s.order_count} adisyon, net ciro ${money(s.revenue)}` +
       (snap.collections.account_collections ? `, cari tahsilat ${money(snap.collections.account_collections)}` : '') +
-      (snap.tips.total ? ` (bahşiş ${money(snap.tips.total)} hariç)` : '');
+      (snap.tips.total ? ` (bahşiş ${money(snap.tips.total)} dahil)` : '');
     for (const [method, amount, subId] of lines) {
       await conn.query(
         `INSERT INTO cash_book_entries
@@ -151,8 +152,8 @@ export const closeDay = async (date, { userId = null, userName = 'Sistem (gün s
     entityId: closingId,
     actionType: recalculated ? 'cashbook_closing_recalculated' : 'cashbook_closing_created',
     title: `Gün Sonu Cirosu ${recalculated ? 'Yeniden Hesaplandı' : 'Kasa Defterine İşlendi'}: ${trDate(date)} (${money(total)})`,
-    details: `${userName}: ${snap.sales.order_count} adisyon, net satış ${money(snap.sales.net)}; deftere işlenen nakit ${money(cash)}, kart ${money(card)}` +
-      (snap.tips.total ? `; bahşiş ${money(snap.tips.total)} (personele ait, deftere işlenmedi).` : '.'),
+    details: `${userName}: ${snap.sales.order_count} adisyon, net ciro ${money(snap.sales.revenue)}; deftere işlenen nakit ${money(cash)}, kart ${money(card)}` +
+      (snap.tips.total ? `; içindeki bahşiş ${money(snap.tips.total)}.` : '.'),
     amount: total
   });
   return { date, closing_id: closingId, cash, card, total, net_sales: snap.sales.net, order_count: snap.sales.order_count, recalculated };
@@ -204,8 +205,8 @@ export const startDailyClosingScheduler = (io) => {
     running = true;
     try {
       if (!migrated) {
-        const n = await recalculateExistingOnce('cashbook_closing_tips_v1');
-        if (n) console.log(`[Gün sonu] ${n} günün cirosu bahşiş hariç olacak şekilde yeniden hesaplandı.`);
+        const n = await recalculateExistingOnce('cashbook_closing_tips_business_v1');
+        if (n) console.log(`[Gün sonu] ${n} günün cirosu bahşiş dahil olacak şekilde yeniden hesaplandı.`);
         migrated = true;
       }
       const closed = await closePendingDays();

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { KeyRound, Lock, X, AlertCircle } from 'lucide-react';
 import { useToast } from './ui/ToastProvider';
+import { setToken, resetSocket } from '../lib/api';
 
 const MIN_PASSWORD_LENGTH = 6;
 
@@ -24,6 +25,11 @@ export default function ChangePasswordModal({ onClose }) {
     setError('');
     try {
       const res = await axios.put('/api/auth/password', { current_password: current, new_password: next });
+      // Eski oturum artık geçersiz: bu cihaz yeni oturumla devam eder
+      if (res.data.token) {
+        setToken(res.data.token);
+        resetSocket();
+      }
       showToast(res.data.message || 'Şifreniz değiştirildi.', 'success');
       onClose();
     } catch (err) {

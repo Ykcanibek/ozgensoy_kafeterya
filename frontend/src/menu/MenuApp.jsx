@@ -6,6 +6,10 @@ import {
 import { io } from 'socket.io-client';
 import { thumbSrc, handleThumbError } from '../lib/images';
 
+// Barındırma her alan adını ayrı süreçte çalıştırır: sipariş ve canlı bildirim personelin bağlı olduğu süreçten geçmeli.
+// Canlı derlemede VITE_MENU_API_URL panel adresidir; geliştirmede boştur ve istekler aynı adrese gider.
+const API_BASE = (import.meta.env.VITE_MENU_API_URL || '').replace(/\/+$/, '');
+
 /*
  * QR MENÜ (müşteri)
  * Masa, QR koddaki anahtardan bilinir; müşteri masa seçmez.
@@ -60,9 +64,9 @@ const STEP_LABELS = ['Alındı', 'Onaylandı', 'Hazırlanıyor', 'Hazır', 'Tesl
 export default function MenuApp({ token }) {
   const session = useMemo(getSession, []);
   const [menu, setMenu] = useState(null);
-  const [error, setError] = useState(token ? null : 'invalid');
+  const [error, setError] = useState(null);
   const [view, setView] = useState('menu'); // 'menu' | 'orders'
-  const [entered, setEntered] = useState(() => (token ? wasEntered(token) : false));
+  const [entered, setEntered] = useState(() => (token ? wasEntered(token) : true)); // Masasız inceleme: karşılama ekranı masaya özeldir
   const [activeCat, setActiveCat] = useState(null);
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState(() => (token ? loadCart(token) : []));
@@ -78,9 +82,8 @@ export default function MenuApp({ token }) {
 
   // Menü (ilk açılışta; ayrıca işletme QR siparişi açıp kapatınca sessizce yenilenir)
   const loadMenu = useCallback(async ({ silent = false } = {}) => {
-    if (!token) return;
     try {
-      const r = await fetch(`/api/public/menu/${token}`);
+      const r = await fetch(`${API_BASE}/api/public/menu${token ? `/${token}` : ''}`);
       const data = await r.json();
       if (!r.ok) { if (!silent || r.status === 404) setError(r.status === 404 ? 'invalid' : 'server'); return; }
       setMenu(data);
@@ -98,7 +101,7 @@ export default function MenuApp({ token }) {
   const loadOrders = useCallback(async () => {
     if (!token) return;
     try {
-      const r = await fetch(`/api/public/menu/${token}/orders?session=${encodeURIComponent(session)}`);
+      const r = await fetch(`${API_BASE}/api/public/menu/${token}/orders?session=${encodeURIComponent(session)}`);
       const data = await r.json();
       if (data.success) setOrders(data.orders);
     } catch { /* bağlantı geçici olarak kopmuş olabilir */ }
@@ -110,7 +113,7 @@ export default function MenuApp({ token }) {
     // Canlı kanal: garson onaylayınca / mutfak durumu değişince sunucu "değişti" sinyali gönderir
     let pending = null;
     const refresh = () => { clearTimeout(pending); pending = setTimeout(loadOrders, 250); };
-    const socket = io('/menu', { auth: { token } });
+    const socket = io(`${API_BASE}/menu`, { auth: { token } });
     socket.on('menu:orders-changed', refresh);
     socket.on('connect', refresh); // bağlantı koptuysa arada kaçan değişiklikleri al
     socket.on('menu:settings-changed', () => loadMenu({ silent: true }));
@@ -192,7 +195,7 @@ export default function MenuApp({ token }) {
     if (!cart.length || sending) return;
     try {
       setSending(true);
-      const r = await fetch(`/api/public/menu/${token}/orders`, {
+      const r = await fetch(`${API_BASE}/api/public/menu/${token}/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session, items: cart, note: orderNote.trim() || undefined })
@@ -260,11 +263,13 @@ export default function MenuApp({ token }) {
             <button type="button" className="qm-round-btn" onClick={backToCategories} aria-label="Kategorilere dön"><ChevronLeft size={20} /></button>
             <div className="qm-topbar-title">
               <span>Özgensoy Müze Kütüphane</span>
-              <strong>{menu.table.title}</strong>
+              <strong>{menu.table?.title || 'Menü'}</strong>
             </div>
-            <button type="button" className="qm-round-btn" onClick={() => { setView('orders'); loadOrders(); }} aria-label="Masanın siparişleri">
-              <Receipt size={18} />{activeOrders > 0 && <em>{activeOrders}</em>}
-            </button>
+            {menu.table ? (
+              <button type="button" className="qm-round-btn" onClick={() => { setView('orders'); loadOrders(); }} aria-label="Masanın siparişleri">
+                <Receipt size={18} />{activeOrders > 0 && <em>{activeOrders}</em>}
+              </button>
+            ) : <span className="qm-round-btn" style={{ visibility: 'hidden' }} aria-hidden="true" />}
           </div>
           <nav className="qm-cats" ref={catBarRef}>
             {menu.categories.map(c => (
@@ -275,18 +280,18 @@ export default function MenuApp({ token }) {
       ) : (
         <header className="qm-header">
           <div className="qm-topbar">
-            <button type="button" className="qm-brand" onClick={() => setEntered(false)} aria-label="Karşılama ekranına dön">
+            <button type="button" className="qm-brand" onClick={() => { if (menu.table) setEntered(false); }} aria-label={menu.table ? 'Karşılama ekranına dön' : 'Özgensoy'}>
               <strong>Özgensoy</strong>
               <span>Müze · Kütüphane · Kafeterya</span>
             </button>
-            <span className="qm-table"><Armchair size={14} /> {menu.table.title}</span>
+            {menu.table && <span className="qm-table"><Armchair size={14} /> {menu.table.title}</span>}
           </div>
-          <div className="qm-tabs" role="tablist">
+          {menu.table && <div className="qm-tabs" role="tablist">
             <button type="button" role="tab" aria-selected={view === 'menu'} className={view === 'menu' ? 'active' : ''} onClick={() => setView('menu')}>Menü</button>
             <button type="button" role="tab" aria-selected={view === 'orders'} className={view === 'orders' ? 'active' : ''} onClick={() => { setView('orders'); loadOrders(); }}>
               Siparişler{activeOrders > 0 && <em>{activeOrders}</em>}
             </button>
-          </div>
+          </div>}
         </header>
       )}
 
@@ -310,7 +315,7 @@ export default function MenuApp({ token }) {
       {view === 'menu' && !currentCat && (
         <main className="qm-main">
           <div className="qm-home-head">
-            <p>{menu.table.title} · Hoş geldiniz</p>
+            <p>{menu.table ? `${menu.table.title} · ` : ''}Hoş geldiniz</p>
             <span className="qm-ornament" aria-hidden="true" />
           </div>
           <label className="qm-search">
@@ -338,7 +343,7 @@ export default function MenuApp({ token }) {
               ))}
             </div>
           )}
-          <Colophon />
+          <Colophon canOrder={orderingEnabled} />
         </main>
       )}
 
@@ -355,7 +360,7 @@ export default function MenuApp({ token }) {
               <ProductRow key={p.id} p={p} qty={qtyInCart(p.id)} canOrder={orderingEnabled} onOpen={() => setDetail(p)} onAdd={() => addToCart(p.id)} onRemove={() => quickRemove(p.id)} />
             ))}
           </section>
-          <Colophon />
+          <Colophon canOrder={orderingEnabled} />
         </main>
       )}
 
@@ -541,14 +546,14 @@ function ProductSheet({ p, canOrder = true, onClose, onAdd }) {
 }
 
 // Menünün altında işletmenin tabeladaki tam adı
-function Colophon() {
+function Colophon({ canOrder }) {
   return (
     <footer className="qm-colophon">
       <span className="qm-colophon-mark" aria-hidden="true"><BookOpen size={16} strokeWidth={1.6} /></span>
       <strong>Özgensoy</strong>
       <span>Müze Kütüphane Kafeterya</span>
       <em>&amp; Kültür Sanat Atölyesi</em>
-      <p>Siparişiniz garson onayından sonra hazırlanır. Ödemeyi kasada yapabilirsiniz.</p>
+      {canOrder && <p>Siparişiniz garson onayından sonra hazırlanır. Ödemeyi kasada yapabilirsiniz.</p>}
     </footer>
   );
 }

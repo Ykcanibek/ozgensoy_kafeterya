@@ -102,6 +102,7 @@ export const ALL_PERMISSIONS = [
   { key: 'payment.veresiye', category: 'payment', action: 'create', label: 'Veresiye (cari hesaba) yazma', description: 'Hesabı müşterinin cari hesabına borç olarak kaydedebilir.', risk: 'high', requires: ['payment.view', 'customers.view'] },
   { key: 'payment.discount', category: 'payment', action: 'special', label: 'İndirim uygulama', description: 'Tahsilatta indirim yapabilir. Rolün indirim üst sınırı ile kısıtlanabilir.', risk: 'high', requires: ['payment.view'] },
   { key: 'payment.tip', category: 'payment', action: 'special', label: 'Bahşiş girme', description: 'Tahsilata bahşiş tutarı ekleyebilir.', requires: ['payment.view'] },
+  { key: 'payment.void', category: 'payment', action: 'special', label: 'Tahsilatı geri alma', description: 'Açık masada bugün alınan bir tahsilatı nedenini yazarak geri alabilir; o tahsilatla ödenen ürünler tekrar ödenmemiş olur.', risk: 'high', requires: ['payment.view'] },
   { key: 'payment.print', category: 'payment', action: 'special', label: 'Adisyon ve müşteri fişi yazdırma', description: 'Masa adisyonunu ve müşteri fişini yazdırabilir.', requires: ['payment.view'] },
 
   // 3b. Kasa Defteri
@@ -150,6 +151,7 @@ export const ALL_PERMISSIONS = [
   { key: 'reports.staff', category: 'reports', action: 'view', label: 'Personel satış karnesini görme', description: 'Personel bazlı ciro ve tahsilat performansını görebilir.', requires: ['reports.view'] },
   { key: 'reports.treats', category: 'reports', action: 'view', label: 'İkram, iade ve iptal raporunu görme', description: 'Personel bazlı zayi ve ikram takibini görebilir.', requires: ['reports.view'] },
   { key: 'reports.audit', category: 'reports', action: 'view', label: 'Denetim ve işlem günlüğünü görme', description: 'Sistemde kim, ne zaman, ne yaptı kayıtlarını görebilir.', requires: ['reports.view'] },
+  { key: 'reports.backup', category: 'reports', action: 'special', label: 'Yedekleri alma ve indirme', description: 'Veritabanı ve görsel yedeklerini alıp indirebilir. Yedekte tüm işletme verisi ve personel şifre özetleri bulunur.', risk: 'high' },
   { key: 'reports.z_report', category: 'reports', action: 'special', label: 'Z-raporu alma ve yazdırma', description: 'Gün sonu Z-raporunu oluşturup yazdırabilir.', requires: ['reports.view'] },
 
   // 9. Personel Yönetimi

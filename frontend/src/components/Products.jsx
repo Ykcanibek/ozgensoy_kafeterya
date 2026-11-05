@@ -214,6 +214,8 @@ export default function Products() {
 
     const socket = createSocket();
 
+    socket.on('resync', () => { fetchProducts(); fetchCategories(); });
+
     socket.on('product:created', (newProd) => {
       setProducts(prev => {
         if (prev.some(p => p.id === newProd.id)) return prev;

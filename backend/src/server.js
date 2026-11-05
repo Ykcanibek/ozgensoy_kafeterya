@@ -14,6 +14,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 import { initDatabase } from './models/initDb.js';
 import { ensureThumbnails } from './config/upload.js';
 import { startDailyClosingScheduler } from './services/dailyClosing.js';
+import { startBackupScheduler } from './services/backup.js';
 import { pool } from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
 import tableRoutes from './routes/tableRoutes.js';
@@ -28,10 +29,11 @@ import wasteRoutes from './routes/wasteRoutes.js';
 import publicRoutes from './routes/publicRoutes.js';
 import qrOrderRoutes from './routes/qrOrderRoutes.js';
 import cashBookRoutes from './routes/cashBookRoutes.js';
+import backupRoutes from './routes/backupRoutes.js';
 import { findTable } from './controllers/publicMenuController.js';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET } from './config/auth.js';
-import { requireAuth, loadUserProfile, canAny } from './middleware/auth.js';
+import { requireAuth, loadUserProfile, canAny, isTokenCurrent } from './middleware/auth.js';
 
 dotenv.config();
 
@@ -48,6 +50,30 @@ app.use(cors({
   origin: corsOrigin,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
 }));
+
+// Tarayıcı güvenlik başlıkları. Menü sayfası sipariş ve canlı bağlantı için panel adresine bağlanır (CORS_ORIGIN).
+app.disable('x-powered-by');
+const CONNECT_SOURCES = ["'self'", ...CORS_ORIGINS, ...CORS_ORIGINS.map(origin => origin.replace(/^http/, 'ws'))];
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'", // Bileşenlerdeki satır içi stiller
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  `connect-src ${CONNECT_SOURCES.join(' ')}`,
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'"
+].join('; ');
+app.use((req, res, next) => {
+  res.setHeader('Content-Security-Policy', CONTENT_SECURITY_POLICY);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  if (process.env.NODE_ENV === 'production') res.setHeader('Strict-Transport-Security', 'max-age=15552000');
+  next();
+});
 
 app.use(express.json());
 
@@ -87,9 +113,10 @@ io.use(async (socket, next) => {
   try {
     const decoded = jwt.verify(socket.handshake.auth?.token || '', JWT_SECRET);
     const user = await loadUserProfile(decoded.id);
-    if (!user || !user.is_active) return next(new Error('UNAUTHENTICATED'));
+    if (!user || !user.is_active || !isTokenCurrent(decoded, user)) return next(new Error('UNAUTHENTICATED'));
     socket.data.user = user;
     socket.data.tokenExp = decoded.exp;
+    socket.data.tokenVersion = user.token_version;
     next();
   } catch (error) {
     next(new Error('UNAUTHENTICATED'));
@@ -97,7 +124,7 @@ io.use(async (socket, next) => {
 });
 
 // Bağlı kullanıcıların yetkileri düzenli olarak tazelenir: rolü değişen personel yeni yetkileriyle olay alır,
-// pasife alınan veya oturum süresi dolan bağlantı kesilir (istemci yeni token ile yeniden bağlanır).
+// pasife alınan, şifresi değişen veya oturum süresi dolan bağlantı kesilir (istemci yeni token ile yeniden bağlanır).
 const SOCKET_REFRESH_MS = 60 * 1000;
 setInterval(async () => {
   const nowSec = Date.now() / 1000;
@@ -105,22 +132,13 @@ setInterval(async () => {
     try {
       if (socket.data.tokenExp && socket.data.tokenExp < nowSec) { socket.disconnect(true); continue; }
       const user = await loadUserProfile(socket.data.user.id);
-      if (!user || !user.is_active) { socket.disconnect(true); continue; }
+      if (!user || !user.is_active || user.token_version !== socket.data.tokenVersion) { socket.disconnect(true); continue; }
       socket.data.user = user;
     } catch (error) {
       console.error('[Socket.io] Yetki tazeleme hatası:', error.message);
     }
   }
 }, SOCKET_REFRESH_MS).unref();
-
-// Socket.io bağlantıları
-io.on('connection', (socket) => {
-  console.log(`[Socket.io] Yeni istemci bağlandı: ${socket.id}`);
-
-  socket.on('disconnect', () => {
-    console.log(`[Socket.io] İstemci ayrıldı: ${socket.id}`);
-  });
-});
 
 // Müşteri QR menüsü için oturumsuz kanal: bağlantı yalnızca geçerli masa QR anahtarıyla kabul edilir
 // ve o masanın odasına katılır. Bu kanaldan veri gönderilmez; yalnızca "siparişler değişti" sinyali gider,
@@ -221,6 +239,7 @@ app.use('/api/staff', staffRoutes);
 app.use('/api/waste', wasteRoutes);
 app.use('/api/qr-orders', qrOrderRoutes);
 app.use('/api/cashbook', cashBookRoutes);
+app.use('/api/backups', backupRoutes);
 
 // Canlı kurulum: derlenmiş arayüz (frontend/dist) aynı sunucudan, aynı porttan sunulur (ayrıca web sunucusu gerekmez).
 //  /m/<masa-anahtarı> → müşteri QR menüsü (menu.html) · diğer tüm adresler → personel paneli (index.html)
@@ -266,6 +285,7 @@ async function startServer() {
     await initDatabase();
     await ensureThumbnails(); // Eski görsellerin küçük kopyalarını tamamla
     startDailyClosingScheduler(socketEmitter); // Gece 00:00'dan sonra önceki günün cirosu kasa defterine işlenir
+    startBackupScheduler(); // Günde bir veritabanı yedeği
     server.listen(PORT, () => {
       console.log(`🚀 Kafe Otomasyon Backend çalışıyor: ${/^\d+$/.test(String(PORT)) ? `http://localhost:${PORT}` : PORT}`);
     });

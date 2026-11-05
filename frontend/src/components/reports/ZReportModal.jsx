@@ -47,7 +47,8 @@ export default function ZReportModal({ data, periodLabel, user, onClose, onOpenC
             <Row label="İkram" value={`- ${money(sales.complimentary)}`} />
             <Row label="İade" value={`- ${money(sales.returned)}`} />
             <Row label="İndirim" value={`- ${money(sales.discount)}`} />
-            <Row label="NET SATIŞ" value={money(sales.net)} strong />
+            <Row label="Bahşiş" value={`+ ${money(sales.tip || 0)}`} />
+            <Row label="NET CİRO" value={money(sales.revenue ?? sales.net)} strong />
             <Row label="Ortalama adisyon" value={money(sales.average_ticket)} />
             <Row label="İptal edilen" value={money(sales.voided)} />
             {sales.unpaid_closed > 0 && <Row label="Tahsilsiz kapatılan" value={money(sales.unpaid_closed)} strong />}
@@ -59,8 +60,8 @@ export default function ZReportModal({ data, periodLabel, user, onClose, onOpenC
             <Row label="KASAYA GİREN" value={money(collections.drawer_total)} strong />
             <Row label="  içinde bahşiş" value={money(collections.tip)} />
             <Row label="  içinde cari tahsilat" value={money(collections.account_collections)} />
-            {/* Kasa defteri cirosu bahşiş hariçtir (bahşiş personele aittir); iki rapor bu satırla birbirine bağlanır */}
-            <Row label="KASA DEFTERİNE İŞLENEN" value={money(collections.drawer_total - collections.tip)} strong />
+            {/* Bahşiş işletmeye kalır: kasaya girenin tamamı kasa defterine işlenir; iki rapor bu satırla birbirine bağlanır */}
+            <Row label="KASA DEFTERİNE İŞLENEN" value={money(collections.drawer_total)} strong />
             <Row label={`Veresiye (${num(collections.counts.veresiye)})`} value={money(collections.veresiye)} />
             {collections.counts.mixed > 0 && <Row label="Parçalı ödeme sayısı" value={num(collections.counts.mixed)} />}
 

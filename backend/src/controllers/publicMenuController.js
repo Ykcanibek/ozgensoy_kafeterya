@@ -16,7 +16,7 @@ const MAX_QTY_PER_LINE = 20;
 const MAX_PENDING_PER_TABLE = 5;
 const MAX_PENDING_PER_SESSION = 3;
 const IP_WINDOW_MS = 10 * 60 * 1000;
-const IP_MAX_ORDERS = 10;
+const IP_MAX_ORDERS = 60; // Kafe Wi-Fi'ındaki tüm müşteriler aynı adresten görünür; asıl sınır telefon ve masa başınadır
 const ORDER_HISTORY_HOURS = 12;
 
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
@@ -45,26 +45,41 @@ const VISIBLE_PRODUCTS_SQL = `
   WHERE p.status = 1 AND p.show_in_qr = 1 AND c.status = 1 AND c.show_in_qr = 1
 `;
 
+const fetchVisibleMenu = async () => {
+  const [categories] = await pool.query(`
+    SELECT id, name, icon, image_url FROM categories
+    WHERE status = 1 AND show_in_qr = 1
+    ORDER BY order_num ASC, id ASC
+  `);
+  const [products] = await pool.query(`${VISIBLE_PRODUCTS_SQL} ORDER BY p.order_num ASC, p.id ASC`);
+  const usedCategoryIds = new Set(products.map(p => p.category_id));
+  return {
+    categories: categories.filter(c => usedCategoryIds.has(c.id)),
+    products: products.map(p => ({ ...p, price: Number(p.price) }))
+  };
+};
+
+/** Masasız menü (alan adına doğrudan girenler): yalnızca incelenir, sipariş her zaman kapalıdır */
+export const getBrowseMenu = async (req, res) => {
+  try {
+    res.json({ success: true, table: null, ordering_enabled: false, ...(await fetchVisibleMenu()) });
+  } catch (error) {
+    console.error('QR menü hatası:', error);
+    res.status(500).json({ success: false, message: 'Menü yüklenemedi' });
+  }
+};
+
 /** Masanın menüsü */
 export const getPublicMenu = async (req, res) => {
   try {
     const table = await findTable(req.params.token);
     if (!table) return notFound(res);
 
-    const [categories] = await pool.query(`
-      SELECT id, name, icon, image_url FROM categories
-      WHERE status = 1 AND show_in_qr = 1
-      ORDER BY order_num ASC, id ASC
-    `);
-    const [products] = await pool.query(`${VISIBLE_PRODUCTS_SQL} ORDER BY p.order_num ASC, p.id ASC`);
-    const usedCategoryIds = new Set(products.map(p => p.category_id));
-
     res.json({
       success: true,
       table: { title: table.title },
       ordering_enabled: await isQrOrderingEnabled(),
-      categories: categories.filter(c => usedCategoryIds.has(c.id)),
-      products: products.map(p => ({ ...p, price: Number(p.price) }))
+      ...(await fetchVisibleMenu())
     });
   } catch (error) {
     console.error('QR menü hatası:', error);

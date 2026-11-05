@@ -5,7 +5,8 @@ import { pool } from './db.js';
  * Bilinen ayarlar ve varsayılanları burada tanımlıdır; tabloda kayıt yoksa varsayılan kullanılır.
  */
 const DEFAULTS = {
-  qr_ordering_enabled: '1' // QR menüden sipariş alma açık mı
+  qr_ordering_enabled: '1', // QR menüden sipariş alma açık mı
+  auto_receipt_enabled: '1' // Hesap kapanınca müşteri fişi yazdırma penceresi kendiliğinden açılsın mı
 };
 
 export const getSetting = async (key) => {
@@ -22,3 +23,4 @@ export const setSetting = async (key, value, userId = null) => {
 };
 
 export const isQrOrderingEnabled = async () => (await getSetting('qr_ordering_enabled')) === '1';
+export const isAutoReceiptEnabled = async () => (await getSetting('auto_receipt_enabled')) === '1';

@@ -257,7 +257,7 @@ export const resetStaffPassword = async (req, res) => {
     }
 
     const hash = await bcrypt.hash(String(password), 10);
-    await pool.query('UPDATE users SET password = ? WHERE id = ?', [hash, existing.id]);
+    await pool.query('UPDATE users SET password = ?, token_version = token_version + 1 WHERE id = ?', [hash, existing.id]);
 
     await logActivity({
       userId: actor.id,

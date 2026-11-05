@@ -47,7 +47,7 @@ export default function OrdersSection({ data, fileLabel, multiDay, onOpenOrder }
     { label: 'İkram (TL)', value: o => o.complimentary },
     { label: 'İade (TL)', value: o => o.returned },
     { label: 'İndirim (TL)', value: o => o.discount },
-    { label: 'Net (TL)', value: o => o.net },
+    { label: 'Net ciro (TL)', value: o => o.net },
     { label: 'Nakit (TL)', value: o => o.cash },
     { label: 'Kart (TL)', value: o => o.card },
     { label: 'Veresiye (TL)', value: o => o.veresiye },
@@ -85,7 +85,7 @@ export default function OrdersSection({ data, fileLabel, multiDay, onOpenOrder }
                 <SortTh id="item_qty" sort={sort} setSort={setSort} num>Ürün</SortTh>
                 <SortTh id="gross" sort={sort} setSort={setSort} num>Brüt</SortTh>
                 <SortTh id="deductions" sort={sort} setSort={setSort} num title="İkram + iade + indirim">Düşüm</SortTh>
-                <SortTh id="net" sort={sort} setSort={setSort} num>Net</SortTh>
+                <SortTh id="net" sort={sort} setSort={setSort} num>Net ciro</SortTh>
                 <th>Ödeme</th>
                 <SortTh id="closed_by" sort={sort} setSort={setSort}>Kapatan</SortTh>
                 <SortTh id="duration_minutes" sort={sort} setSort={setSort} num>Süre</SortTh>
@@ -100,7 +100,7 @@ export default function OrdersSection({ data, fileLabel, multiDay, onOpenOrder }
                   <td className="num" data-label="Ürün">{num(o.item_qty)}</td>
                   <td className="num muted" data-label="Brüt">{money(o.gross)}</td>
                   <td className="num muted" data-label="Düşüm">{o.deductions ? `− ${money(o.deductions)}` : '—'}</td>
-                  <td className="num strong m-hero" data-label="Net">{money(o.net)}</td>
+                  <td className="num strong m-hero" data-label="Net ciro">{money(o.net)}</td>
                   <td className="m-span" data-label="Ödeme">
                     <div className="rh-badges">
                       {o.payment_types.map(pt => <span key={pt} className={`rh-pay ${pt}`}>{PAYMENT_LABELS[pt]}</span>)}

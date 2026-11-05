@@ -178,17 +178,6 @@ export default function UserSwitcher() {
         }}>
           {user?.name}
         </span>
-        <span style={{
-          background: 'rgba(52, 108, 128, 0.08)',
-          color: '#346c80',
-          padding: '1px 5px',
-          borderRadius: '4px',
-          fontSize: '0.68rem',
-          fontWeight: '700',
-          flexShrink: 0
-        }}>
-          {user?.role_name || getRoleLabel(user?.role)}
-        </span>
 
         <ChevronDown 
           size={13} 

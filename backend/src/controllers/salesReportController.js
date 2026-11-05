@@ -85,12 +85,14 @@ export const fetchClosedOrders = async (range) => {
   return rows.map(r => {
     const gross = round2(r.gross), comp = round2(r.comp), ret = round2(r.ret), discount = round2(r.discount);
     const net = round2(gross - comp - ret - discount);
+    const tip = round2(r.tip);
     return {
       ...r,
       gross, comp, ret, discount, net,
+      revenue: round2(net + tip), // Net ciro: raporların ana rakamı (bahşiş işletmeye kalır)
       voided: round2(r.voided),
       settled: round2(r.settled),
-      tip: round2(r.tip),
+      tip,
       cash: round2(r.cash),
       card: round2(r.card),
       veresiye: round2(r.veresiye),
@@ -108,6 +110,8 @@ export const salesTotals = (orders) => {
   const gross = sumBy(orders, 'gross');
   const comp = sumBy(orders, 'comp'), ret = sumBy(orders, 'ret'), voided = sumBy(orders, 'voided');
   const discount = sumBy(orders, 'discount');
+  // net: ürün satışı (fiyatlardan gelen tutar) · revenue: net ciro = net + bahşiş; raporlarda gösterilen rakam budur
+  const tip = sumBy(orders, 'tip');
   const itemQty = orders.reduce((s, o) => s + o.item_qty, 0);
   const durations = orders.map(o => (new Date(o.closed_at) - new Date(o.created_at)) / 60000).filter(m => m >= 0);
   // Kayıp = ikram + iade + iptal; oran, iptal dahil sipariş edilen toplam tutara göre
@@ -119,10 +123,12 @@ export const salesTotals = (orders) => {
     returned: ret,
     discount,
     net,
+    tip,
+    revenue: round2(net + tip),
     voided,
     unpaid_closed: sumBy(orders, 'unpaid_closed'),
     item_qty: itemQty,
-    average_ticket: orders.length ? round2(net / orders.length) : 0,
+    average_ticket: orders.length ? round2((net + tip) / orders.length) : 0,
     items_per_ticket: orders.length ? round2(itemQty / orders.length) : 0,
     avg_duration_min: durations.length ? Math.round(durations.reduce((s, m) => s + m, 0) / durations.length) : 0,
     loss_amount: loss,
@@ -131,13 +137,13 @@ export const salesTotals = (orders) => {
   };
 };
 
-/** Haftanın günü × saat dağılımı (Pazartesi = 0) ve tekil gün/saat toplamları */
+/** Haftanın günü × saat dağılımı (Pazartesi = 0) ve tekil gün/saat toplamları; "net" alanı net cirodur */
 const buildDistribution = (orders) => {
   const heat = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => ({ net: 0, orders: 0 })));
   for (const o of orders) {
     const d = new Date(o.closed_at);
     const cell = heat[(d.getDay() + 6) % 7][d.getHours()];
-    cell.net = round2(cell.net + o.net);
+    cell.net = round2(cell.net + o.revenue);
     cell.orders += 1;
   }
   const weekdays = heat.map((row, i) => ({ day: i, net: round2(row.reduce((s, c) => s + c.net, 0)), orders: row.reduce((s, c) => s + c.orders, 0) }));
@@ -182,11 +188,11 @@ export const fetchCollections = async (range) => {
   };
 };
 
-/** Trend: tek gün → saatlik, ≤ 62 gün → günlük, daha uzun → aylık (boş dilimler 0 ile doldurulur) */
+/** Trend: tek gün → saatlik, ≤ 62 gün → günlük, daha uzun → aylık (boş dilimler 0 ile doldurulur); "net" alanı net cirodur */
 export const buildTrend = (orders, range) => {
   const add = (map, key, o) => {
     const b = map.get(key) || { net: 0, orders: 0 };
-    b.net = round2(b.net + o.net);
+    b.net = round2(b.net + o.revenue);
     b.orders += 1;
     map.set(key, b);
   };
@@ -312,7 +318,7 @@ export const getSalesSummary = async (req, res) => {
       sales,
       collections,
       comparison: prevSales ? Object.fromEntries([
-        ['net', sales.net, prevSales.net],
+        ['revenue', sales.revenue, prevSales.revenue],
         ['gross', sales.gross, prevSales.gross],
         ['order_count', sales.order_count, prevSales.order_count],
         ['average_ticket', sales.average_ticket, prevSales.average_ticket],
@@ -320,6 +326,7 @@ export const getSalesSummary = async (req, res) => {
         ['avg_duration_min', sales.avg_duration_min, prevSales.avg_duration_min],
         ['loss_amount', sales.loss_amount, prevSales.loss_amount],
         ['discount', sales.discount, prevSales.discount],
+        ['tip', sales.tip, prevSales.tip],
         ['drawer_total', collections.drawer_total, prevCollections.drawer_total],
         ['veresiye', collections.veresiye, prevCollections.veresiye]
       ].map(([key, cur, prv]) => [key, { previous: prv, change: percentChange(cur, prv) }])) : null,
@@ -406,7 +413,7 @@ export const getClosedOrders = async (req, res) => {
         closed_at: o.closed_at,
         duration_minutes: Math.max(0, Math.round((new Date(o.closed_at) - new Date(o.created_at)) / 60000)),
         item_qty: o.item_qty,
-        gross: o.gross, complimentary: o.comp, returned: o.ret, discount: o.discount, net: o.net,
+        gross: o.gross, complimentary: o.comp, returned: o.ret, discount: o.discount, net: o.revenue,
         cash: o.cash, card: o.card, veresiye: o.veresiye, tip: o.tip,
         payment_count: o.payment_count,
         unpaid_closed: o.unpaid_closed,
@@ -470,6 +477,7 @@ export const getOrderDetail = async (req, res) => {
       payments,
       totals: {
         gross, complimentary: comp, returned: ret, discount, net,
+        revenue: round2(net + payments.reduce((s, p) => s + Number(p.tip), 0)),
         voided: sum(items, i => i.item_status === 'cancelled'),
         tip: round2(payments.reduce((s, p) => s + Number(p.tip), 0)),
         collected: settled,
@@ -649,13 +657,13 @@ export const getTablePerformance = async (req, res) => {
     for (const o of orders) {
       const s = stats.get(o.table_id) || { orders: 0, net: 0, item_qty: 0, minutes: 0, loss: 0 };
       s.orders += 1;
-      s.net = round2(s.net + o.net);
+      s.net = round2(s.net + o.revenue);
       s.item_qty += o.item_qty;
       s.minutes += Math.max(0, (new Date(o.closed_at) - new Date(o.created_at)) / 60000);
       s.loss = round2(s.loss + o.comp + o.ret + o.voided);
       stats.set(o.table_id, s);
     }
-    const totalNet = sumBy(orders, 'net');
+    const totalNet = sumBy(orders, 'revenue');
 
     const rows = tables
       .filter(t => t.is_active || stats.has(t.id))

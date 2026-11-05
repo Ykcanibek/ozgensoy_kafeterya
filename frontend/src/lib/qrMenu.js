@@ -1,4 +1,5 @@
 import QRCode from 'qrcode';
+import printFontsCss from '../styles/fonts-qr-print.css?inline';
 
 /**
  * QR menünün yayınlandığı adres. Canlıda .env içinde VITE_MENU_URL=https://ozgensoykafeterya.com verilir;
@@ -70,9 +71,8 @@ export const printQrCards = async (tables) => {
   })));
   win.document.open();
   win.document.write(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>Masa QR Kodları</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=DM+Sans:wght@500;700&display=swap" rel="stylesheet">
 <style>
+${printFontsCss}
   /* QR menüyle aynı kimlik: fildişi kâğıt, lacivert ve altın */
   @page { size: A4; margin: 12mm; }
   * { box-sizing: border-box; }
@@ -97,6 +97,10 @@ ${cards.map(c => `<div class="card">
   <div class="hint">Menü ve sipariş için okutun</div>
   <div class="sub">Siparişiniz garson onayıyla hazırlanır</div>
 </div>`).join('')}
-</div><script>window.onload = () => (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => setTimeout(() => window.print(), 300));<\/script></body></html>`);
+</div></body></html>`);
   win.document.close();
+  // Satır içi betik güvenlik başlığıyla (CSP) engellenir: yazdırma bu pencereden başlatılır
+  const startPrint = () => (win.document.fonts ? win.document.fonts.ready : Promise.resolve()).then(() => setTimeout(() => win.print(), 300));
+  if (win.document.readyState === 'complete') startPrint();
+  else win.addEventListener('load', startPrint);
 };

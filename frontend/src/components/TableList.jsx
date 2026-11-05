@@ -6,6 +6,7 @@ import Sidebar from './Sidebar';
 import UserSwitcher from './UserSwitcher';
 import Navbar from './Navbar';
 import TableOrderModal from './TableOrderModal';
+import CustomerReceiptPrintModal from './reports/CustomerReceiptPrintModal';
 import { useToast } from './ui/ToastProvider';
 import { useConfirm } from './ui/ConfirmProvider';
 import { 
@@ -25,12 +26,15 @@ import {
   ChevronDown,
   Clock,
   QrCode,
-  BellRing
+  BellRing,
+  Printer
 } from 'lucide-react';
 import useQrRequests from './qr/useQrRequests';
 import QrRequestsModal from './qr/QrRequestsModal';
 import QrInbox from './qr/QrInbox';
 import QrOrderingToggle from './qr/QrOrderingToggle';
+import AutoReceiptToggle from './tableOrder/AutoReceiptToggle';
+import ClosedReceiptsModal from './tableOrder/ClosedReceiptsModal';
 import TableQrModal from './qr/TableQrModal';
 import { printQrCards, MENU_URL_CONFIGURED, MENU_URL_WARNING } from '../lib/qrMenu';
 
@@ -63,6 +67,9 @@ export default function TableList() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedTable, setSelectedTable] = useState(null);
   const [activeOrderTable, setActiveOrderTable] = useState(null);
+  const [closingReceipt, setClosingReceipt] = useState(null); // Hesap kapanınca açılan müşteri fişi
+  const [autoReceipt, setAutoReceipt] = useState(true); // Otomatik fiş ayarı (kapalıysa hesap kapanınca fiş açılmaz)
+  const [showClosedReceipts, setShowClosedReceipts] = useState(false); // Kapanan hesapların fişleri penceresi
   
   // Form alanları
   const [tableTitle, setTableTitle] = useState('');
@@ -88,6 +95,8 @@ export default function TableList() {
     fetchTables();
 
     const socket = createSocket();
+
+    socket.on('resync', () => fetchTables());
 
     socket.on('table:created', (newTable) => {
       setTables((prev) => [...prev, newTable]);
@@ -285,9 +294,6 @@ export default function TableList() {
   };
 
   // İstatistikler
-  const totalTables = tables.length;
-  const emptyCount = tables.filter(t => t.status === 'empty').length;
-  const occupiedCount = tables.filter(t => t.status === 'occupied').length;
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -350,16 +356,14 @@ export default function TableList() {
         style={{ marginBottom: isEditMode ? '12px' : '20px' }}
         stats={
           <>
-            <div className="pos-stat-pill pos-stat-pill-total">
-              Toplam: <strong>{totalTables}</strong>
-            </div>
-            <div className="pos-stat-pill pos-stat-pill-empty">
-              Boş: <strong>{emptyCount}</strong>
-            </div>
-            <div className="pos-stat-pill pos-stat-pill-occupied">
-              Dolu: <strong>{occupiedCount}</strong>
-            </div>
             {can('pos.view') && <QrOrderingToggle canEdit={can('tables.edit')} />}
+            {can('payment.print') && <AutoReceiptToggle canEdit={can('payment.print')} onChange={setAutoReceipt} />}
+            {can('payment.print') && (
+              <button type="button" className="pos-receipts-btn" onClick={() => setShowClosedReceipts(true)}
+                title="Kapanan hesapların fişini yeniden yazdır">
+                <Printer size={14} /> Fişler
+              </button>
+            )}
           </>
         }
         actions={canManageTables && (
@@ -866,8 +870,12 @@ export default function TableList() {
           onClose={() => setActiveOrderTable(null)}
           onTableUpdated={fetchTables}
           onTableSwitched={setActiveOrderTable}
+          onPrintReceipt={autoReceipt ? setClosingReceipt : undefined}
         />
       )}
+      {/* Hesap kapanınca masanın tüm fişi otomatik açılır (masa penceresi kapandıktan sonra da ekranda kalır) */}
+      <CustomerReceiptPrintModal printingReceipt={closingReceipt} setPrintingReceipt={setClosingReceipt} />
+      {showClosedReceipts && <ClosedReceiptsModal onClose={() => setShowClosedReceipts(false)} onPrint={setClosingReceipt} />}
 
       {/* Onay bekleyen tüm QR siparişleri */}
       {showQrRequests && (

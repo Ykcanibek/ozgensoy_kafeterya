@@ -1,6 +1,6 @@
 /* ======================================================== */
 /* KASA DEFTERİ                                             */
-/* Gelir yeşil · Gider kırmızı · POS (otomatik) amber       */
+/* Gelir yeşil · Gider kırmızı · Günlük ciro (otomatik) petrol */
 /* Kategoriler dallanmalı: ana kategori › alt kategori      */
 /* ======================================================== */
 .cb-page {
@@ -14,8 +14,10 @@
   --cb-in-soft: #e6f5ec;
   --cb-out: #c2342b;
   --cb-out-soft: #fdebe9;
-  --cb-pos: #a85a00;
-  --cb-pos-soft: #fff3df;
+  --cb-pos: #1b6688;
+  --cb-pos-soft: #e9f4f9;
+  --cb-pos-ink: #0f4a64;
+  --cb-warn: #a85a00;
   margin: 14px 0 32px;
   display: flex;
   flex-direction: column;
@@ -93,6 +95,7 @@
   border: 1.5px solid var(--cb-line); border-radius: 10px; padding: 7px 8px; font-family: inherit; font-size: 0.8rem; font-weight: 700;
   color: var(--cb-ink); background: #ffffff; max-width: 220px;
 }
+.cb-filters select:disabled { background: #f1f5f6; color: #9aaeb5; cursor: not-allowed; }
 .cb-search {
   display: flex; align-items: center; gap: 8px; background: #ffffff; border: 1.5px solid var(--cb-line); border-radius: 10px;
   padding: 0 10px; color: var(--cb-muted); flex: 1 1 200px; min-width: 180px;
@@ -109,7 +112,7 @@
 
 .cb-period-line { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 8px 14px; font-size: 0.78rem; font-weight: 700; color: var(--cb-muted); background: #fafcfd; border-bottom: 1px solid #edf3f5; }
 .cb-period-line strong { color: var(--cb-ink); }
-.cb-period-line .warn { color: var(--cb-pos); }
+.cb-period-line .warn { color: var(--cb-warn); }
 
 .cb-table-wrap { overflow-x: auto; }
 .cb-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
@@ -127,7 +130,20 @@
 .cb-table tbody tr:not(.cb-devir):not(.cb-empty-tr):hover { background: #f7fbfc; }
 .cb-table tr.cb-row-income td:first-child { box-shadow: inset 3px 0 0 var(--cb-in); }
 .cb-table tr.cb-row-expense td:first-child { box-shadow: inset 3px 0 0 var(--cb-out); }
-.cb-table tr.is-pos { background: #fffcf6; }
+/* Günlük ciro (gün sonu) satırları: defterin en önemli satırı, ilk bakışta seçilsin */
+.cb-table tr.is-pos { background: var(--cb-pos-soft); }
+.cb-table tbody tr.is-pos:hover { background: #dcedf5 !important; }
+.cb-table tr.is-pos td:first-child { box-shadow: inset 5px 0 0 var(--cb-pos); }
+.cb-table tr.is-pos td { border-bottom-color: #d3e7f0; }
+.cb-table tr.is-pos td.num.income { font-size: 0.98rem; font-weight: 900; }
+.cb-table tr.is-pos .cb-date { color: var(--cb-pos); }
+.cb-cat.cb-ciro strong { font-size: 0.95rem; font-weight: 900; color: var(--cb-pos-ink); }
+.cb-cat.cb-ciro > span { color: #4d7486 !important; }
+.cb-cat.cb-ciro > span b { color: var(--cb-pos-ink); font-weight: 800; }
+.cb-ciro-badge {
+  margin-left: 4px; padding: 2px 8px; border-radius: 999px; font-size: 0.66rem; font-weight: 800; letter-spacing: 0.02em;
+  text-transform: uppercase; color: #fff; background: var(--cb-pos);
+}
 /* Aynı kayıtta girilen kalemler (ör. Faturalar › Elektrik + Su) birbirine bağlı görünür */
 .cb-table tr.in-batch td { border-top: 0; padding-top: 4px; }
 .cb-table tr.in-batch .cb-date { color: transparent; }
@@ -142,7 +158,6 @@
 .cb-cat .cb-sep { color: #9db3bb; font-weight: 700; }
 .cb-cat .cb-subname { color: var(--cb-brand); }
 .cb-cat > span { display: block; font-size: 0.75rem; font-weight: 600; color: var(--cb-muted); margin-top: 2px; }
-.cb-pos-icon { color: var(--cb-pos); }
 .cb-batch-tag {
   display: inline-flex; align-items: center; gap: 3px; font-size: 0.64rem; font-weight: 800; text-transform: uppercase;
   color: #6d3fc8; background: #f0eafd; border-radius: 999px; padding: 1px 7px; margin-left: 4px;
@@ -374,8 +389,8 @@
 /* ---------- Gün sonu ciro raporu ---------- */
 .cb-modal.cb-report { width: min(760px, 100%); }
 .cb-auto { display: inline-flex !important; align-items: center; gap: 4px; flex-wrap: wrap; }
-.cb-auto em { flex-basis: 100%; font-style: normal; font-size: 0.68rem; font-weight: 700; color: #b07a2a; text-decoration: underline; font-family: inherit !important; }
-.cb-cat-name em.system { color: #a85a00; background: #fff3df; }
+.cb-auto em { flex-basis: 100%; font-style: normal; font-size: 0.68rem; font-weight: 700; color: var(--cb-pos); text-decoration: underline; font-family: inherit !important; }
+.cb-cat-name em.system { color: #1b6688; background: #e9f4f9; }
 .cb-rep-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .cb-rep-kpis > div { background: #f4f8f9; border-radius: 12px; padding: 10px 12px; min-width: 0; }
 .cb-rep-kpis > div.hl { background: #173845; color: #ffffff; }
@@ -405,7 +420,7 @@
 .cb-rep-table .num { text-align: right; font-family: 'Outfit', sans-serif; font-weight: 800; white-space: nowrap; }
 .cb-rep-table td strong { display: block; color: #173845; }
 .cb-rep-table td span { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 0.72rem; font-weight: 600; color: #6b8590; }
-.cb-rep-table em.tag { font-style: normal; font-size: 0.64rem; font-weight: 800; color: #a85a00; background: #fff3df; border-radius: 999px; padding: 0 6px; }
+.cb-rep-table em.tag { font-style: normal; font-size: 0.64rem; font-weight: 800; color: #1b6688; background: #e9f4f9; border-radius: 999px; padding: 0 6px; }
 .cb-link { margin-top: 8px; border: 0; background: transparent; color: #346c80; font-family: inherit; font-size: 0.8rem; font-weight: 800; cursor: pointer; padding: 0; }
 @media (max-width: 767px) {
   .cb-rep-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }

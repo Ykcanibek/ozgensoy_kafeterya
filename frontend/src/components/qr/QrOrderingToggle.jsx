@@ -17,9 +17,11 @@ export default function QrOrderingToggle({ canEdit }) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    axios.get('/api/qr-orders/settings').then(res => setEnabled(res.data.ordering_enabled)).catch(() => {});
+    const load = () => axios.get('/api/qr-orders/settings').then(res => setEnabled(res.data.ordering_enabled)).catch(() => {});
+    load();
     // Başka bir cihazdan değiştirilirse anında yansısın
     const socket = createSocket();
+    socket.on('resync', load);
     socket.on('qr:settings', (p) => setEnabled(Boolean(p?.ordering_enabled)));
     return () => socket.disconnect();
   }, []);
@@ -35,12 +37,14 @@ export default function QrOrderingToggle({ canEdit }) {
       confirmLabel: 'Kapat',
       danger: true
     }))) return;
+    setEnabled(next); // Anahtar hemen kayar; kayıt arkada yapılır
     try {
       setSaving(true);
       const res = await axios.put('/api/qr-orders/settings', { ordering_enabled: next });
       setEnabled(res.data.ordering_enabled);
       showToast(res.data.message, next ? 'updated' : 'info');
     } catch (err) {
+      setEnabled(!next);
       showToast(err.response?.data?.message || 'QR ayarı değiştirilemedi.', 'error');
     } finally {
       setSaving(false);
@@ -50,16 +54,18 @@ export default function QrOrderingToggle({ canEdit }) {
   return (
     <button
       type="button"
-      className={`qr-ordering-toggle ${enabled ? 'on' : 'off'}`}
+      className={`qr-ordering-toggle ${enabled ? 'on' : 'off'}${canEdit ? '' : ' readonly'}`}
       onClick={toggle}
-      disabled={!canEdit || saving}
+      disabled={!canEdit}
+      aria-busy={saving}
       title={canEdit
         ? (enabled ? 'QR menüden sipariş alınıyor. Kapatmak için basın.' : 'QR menüden sipariş alınmıyor. Açmak için basın.')
         : 'QR menüden sipariş alma durumu'}
       aria-pressed={enabled}
+      aria-label={`QR sipariş: ${enabled ? 'açık' : 'kapalı'}`}
     >
       <QrCode size={14} />
-      <span>QR sipariş: <strong>{enabled ? 'Açık' : 'Kapalı'}</strong></span>
+      <span>QR sipariş</span>
       <i aria-hidden="true" />
     </button>
   );

@@ -189,3 +189,13 @@ body {
   box-shadow: 0 20px 50px -10px rgba(27, 65, 79, 0.08), 0 1px 3px rgba(0,0,0,0.03);
   border: 1px solid #b6ced6;
 }
+
+/* Canlı bağlantı koptu uyarısı */
+.conn-banner {
+  position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 3000;
+  display: flex; align-items: center; gap: 8px; max-width: calc(100vw - 24px);
+  padding: 9px 14px; border-radius: 10px; background: #fff6e5; border: 1px solid #f3d29a;
+  color: #8a5300; font-size: 0.84rem; line-height: 1.4; box-shadow: 0 8px 20px -10px rgba(27, 65, 79, 0.45);
+}
+.conn-banner svg { flex: none; }
+@media print { .conn-banner { display: none; } }

@@ -4,8 +4,11 @@ Sistem Veridyen'in **Junior.js** Node.js hosting paketinde (cPanel, Linux) çal�
 
 | Adres | Ne açılır |
 |---|---|
-| `https://ozgensoykafeterya.com` | Personel paneli (giriş ekranı) |
+| `https://panel.ozgensoykafeterya.com` | Personel paneli (giriş ekranı) |
 | `https://ozgensoykafeterya.com/m/<masa-anahtarı>` | Masadaki QR kodun açtığı müşteri menüsü |
+| `https://ozgensoykafeterya.com` | Yalnızca müşteri menüsü ("QR kodu okutun" ekranı); personel girişi buradan açılmaz |
+
+Hosting her alan adını **ayrı süreçte** çalıştırır. Bu yüzden menü sayfası ana adresten açılır, ama sipariş ve canlı bildirim için panel adresindeki sürece bağlanır (`frontend/.env.production` → `VITE_MENU_API_URL`). Hangi ekranın açılacağına uygulama alan adına bakarak karar verir (`backend/.env` → `MENU_HOST`).
 
 ---
 
@@ -96,7 +99,7 @@ Tabloları sizin oluşturmanız gerekmez. Uygulama ilk açıldığında bütün 
 ## 7. Kontrol
 
 - `https://ozgensoykafeterya.com/api/health` adresi `"status":"ok"` göstermeli.
-- `https://ozgensoykafeterya.com` adresinde giriş ekranı açılmalı. **superadmin** kullanıcı adı ve `.env` dosyasındaki `DEV_ACCOUNT_PASSWORD` şifresiyle girin.
+- `https://panel.ozgensoykafeterya.com` adresinde (alt alan adı kurulmadıysa ana adreste) giriş ekranı açılmalı. **superadmin** kullanıcı adı ve `.env` dosyasındaki `DEV_ACCOUNT_PASSWORD` şifresiyle girin.
 - Açılmazsa: **Setup Node.js App** sayfasındaki uygulamada **Restart** deneyin. Hata kayıtları `ozgensoy/stderr.log` dosyasındadır.
 
 ## 8. Açılıştan önce
@@ -117,15 +120,20 @@ Tabloları sizin oluşturmanız gerekmez. Uygulama ilk açıldığında bütün 
 
 ## Yedekleme
 
-- **cPanel → Backup** (veya varsa **JetBackup**) bölümünden veritabanı ve dosya yedeği indirebilirsiniz.
-- **phpMyAdmin → veritabanı → Export** ile hızlıca veritabanı yedeği alabilirsiniz. Haftada bir bilgisayarınıza indirmeniz iyi olur.
+- Sistem **her gün kendiliğinden** veritabanı yedeği alır; son 30 yedek sunucuda `ozgensoy/backend/backups` klasöründe durur (internetten açılmaz).
+- **Panel → Yedekler** ekranından son yedeği indirin ve **haftada bir bilgisayarınıza veya bulut hesabınıza kaydedin**. Ürün görselleri aynı ekrandan ayrıca indirilir. Sunucudaki yedek, sunucu arızasına karşı tek başına yeterli değildir.
+- **Geri yükleme:** cPanel → phpMyAdmin → veritabanını seçin → **Import** → `yedek_....sql.gz` dosyasını seçin. Bu işlem mevcut verinin üzerine yazar. Görseller için `gorseller.tar.gz` dosyasını `ozgensoy/backend` klasörüne açın, sonra **Restart** deyin.
+- cPanel'in kendi **Backup** / **JetBackup** bölümü de ek güvence olarak kullanılabilir.
 
 ## Paylaşımlı hosting'e özgü notlar
 
 - **Uyku:** Bir süre kimse girmezse uygulama uyutulabilir; sonraki ilk açılış birkaç saniye sürer. Verilere zarar vermez.
 - **Gece gün sonu kaydı:** Uygulama gece uyuyorsa, sabah ilk açıldığında eksik günler otomatik olarak kasa defterine işlenir. Kayıtlar yine doğru güne yazılır.
 - **Anlık bildirimler:** Hosting WebSocket desteklemiyorsa sistem kendiliğinden başka bir bağlantı yöntemine geçer; bildirimler birkaç saniye geç gelebilir.
-- **Alt alan adı (subdomain):** Panel için alt alan adına ayrı bir Node.js uygulaması **açmayın**. İkinci bir kopya çalışır ve anlık bildirimler iki kopya arasında bölünür.
+- **Panel alt alan adı:** `panel.ozgensoykafeterya.com` için ayrı bir Node.js uygulaması **açmayın**. Bunun yerine:
+  1. **cPanel → Domains → Create A New Domain**: `panel.ozgensoykafeterya.com`, belge kökü varsayılan kalsın. Sonra `public_html/.htaccess` dosyasını bu alt alan adının klasörüne kopyalayın (aynı uygulama dosyalarını çalıştırır).
+  2. `https://panel.ozgensoykafeterya.com` adresinde giriş ekranının açıldığını görün (SSL için **Run AutoSSL**).
+  3. Ancak ondan sonra `ozgensoy/backend/.env` içinde `MENU_HOST=ozgensoykafeterya.com,www.ozgensoykafeterya.com` yazıp **Restart** deyin. Sıra önemli: önce panel adresi çalışmalı, yoksa personel girişi kapanır.
 - **Ürün görselleri:** Görsel yüklerken "Görsel işleme bu sunucuda kullanılamıyor" hatası alırsanız Veridyen desteğine "sharp paketi çalışmıyor" diye bildirin. Sistemin geri kalanı bu durumda da çalışır.
 
 ---

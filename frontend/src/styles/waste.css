@@ -275,3 +275,24 @@
   .waste-qty select { min-width: 0; flex: 1; }
 }
 .waste-item-side span.no-cost { color: #6b8590; font-weight: 600; }
+
+/* Yedekler sayfası */
+.backups-warning {
+  display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px;
+  background: #fff6e5; border: 1px solid #f3d29a; color: #8a5300; font-size: 0.88rem; font-weight: 600;
+}
+.backups-warning svg { flex: none; }
+.backups-note {
+  padding: 14px 16px; border-radius: 14px; background: #ffffff; border: 1px solid #d5e3e8;
+  color: var(--w-ink-2); font-size: 0.88rem; line-height: 1.5;
+}
+.backups-note p { margin: 0 0 8px; }
+.backups-note .waste-btn { margin-top: 4px; }
+.backups-list { display: flex; flex-direction: column; gap: 8px; }
+.backups-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 14px;
+  border-radius: 12px; background: #ffffff; border: 1px solid #d5e3e8;
+}
+.backups-row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.backups-row-main em { font-style: normal; font-size: 0.78rem; color: var(--w-ink-2); }
+.backups-page .waste-btn { display: inline-flex; align-items: center; gap: 6px; }

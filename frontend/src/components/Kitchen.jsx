@@ -206,6 +206,8 @@ export default function Kitchen() {
   useEffect(() => {
     const socket = createSocket();
 
+    socket.on('resync', () => fetchKitchenOrders(true));
+
     socket.on('order:created', (data) => {
       fetchKitchenOrders(true);
       if (isSoundEnabled) {

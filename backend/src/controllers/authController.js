@@ -13,7 +13,7 @@ const failedLogins = new Map(); // anahtar -> hatalı deneme zamanları
 
 // Oturum token'ı 1 gün geçerlidir; açık ekranlar /api/auth/me ile düzenli olarak yeniler
 const signToken = (user) => jwt.sign(
-  { id: user.id, username: user.username, role: user.role, name: user.name },
+  { id: user.id, username: user.username, role: user.role, name: user.name, tv: user.token_version },
   JWT_SECRET,
   { expiresIn: '1d' }
 );
@@ -121,7 +121,8 @@ export const changeOwnPassword = async (req, res) => {
     failedLogins.delete(attemptKey);
 
     const hash = await bcrypt.hash(String(new_password), 10);
-    await pool.query('UPDATE users SET password = ? WHERE id = ?', [hash, req.user.id]);
+    // Diğer cihazlardaki oturumlar kapanır; bu cihaz yanıttaki yeni oturumla devam eder
+    await pool.query('UPDATE users SET password = ?, token_version = token_version + 1 WHERE id = ?', [hash, req.user.id]);
     await logActivity({
       userId: req.user.id,
       userName: req.user.name,
@@ -131,7 +132,7 @@ export const changeOwnPassword = async (req, res) => {
       title: `Şifre Değiştirildi: ${req.user.name}`,
       details: `${req.user.name} kendi şifresini değiştirdi.`
     });
-    res.json({ success: true, message: 'Şifreniz değiştirildi.' });
+    res.json({ success: true, message: 'Şifreniz değiştirildi.', token: signToken({ ...req.user, token_version: req.user.token_version + 1 }) });
   } catch (error) {
     console.error('Şifre değiştirme hatası:', error);
     res.status(500).json({ success: false, message: 'Şifre değiştirilemedi: ' + error.message });

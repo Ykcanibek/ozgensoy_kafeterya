@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import ErrorBoundary from './components/ui/ErrorBoundary';
+import './styles/fonts-panel.css';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(

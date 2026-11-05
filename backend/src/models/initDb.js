@@ -99,6 +99,8 @@ export async function initDatabase() {
     await modifyColumn('users', 'role', "VARCHAR(50) NOT NULL DEFAULT 'waiter'", c => c.columnType === 'varchar(50)' && c.nullable === 'NO');
     await addColumn('users', 'last_login_at', `TIMESTAMP NULL AFTER is_active`);
     await addColumn('users', 'created_by_user_id', `INT NULL AFTER last_login_at`);
+    // Şifre değişince artar: eski sürümle imzalanmış oturumlar geçersiz olur
+    await addColumn('users', 'token_version', `INT NOT NULL DEFAULT 0 AFTER created_by_user_id`);
 
     // 2. Kategoriler tablosu
     await pool.query(`
@@ -339,6 +341,10 @@ export async function initDatabase() {
     await modifyColumn('payments', 'table_id', 'INT NULL', c => c.nullable === 'YES');
     await addColumn('orders', 'customer_id', `INT NULL AFTER table_id`);
 
+    // Tahsilatlar adisyona ve tarihe göre sorgulanır (masa açma, rapor, kasa defteri)
+    await addIndex('payments', 'idx_payments_order', 'order_id');
+    await addIndex('payments', 'idx_payments_created', 'created_at');
+
     // Adisyon kapanış zamanı: satış raporları adisyonun kapandığı güne göre hesaplanır
     await addColumn('orders', 'closed_at', 'DATETIME NULL AFTER created_at');
     await addIndex('orders', 'idx_orders_closed', 'status, closed_at');
@@ -354,6 +360,55 @@ export async function initDatabase() {
     await addColumn('order_items', 'status_updated_by_user_id', 'INT NULL');
     // Kalemin durumunun son değiştiği an (mutfakta "son teslim edilenler" teslim saatine göre gösterilir)
     await addColumn('order_items', 'status_updated_at', 'DATETIME NULL AFTER status_updated_by_user_id');
+
+    // Ödeme geri alma: ürün seçilerek alınan tahsilatın hangi üründen kaç adet ödediği. Adisyonda aynı ürünün ödenen
+    // satırları birleşik görünür; tahsilat geri alınınca bu kayda göre o adetler tekrar ödenmemiş olur.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS payment_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        payment_id INT NOT NULL,
+        order_id INT NOT NULL,
+        product_id INT NOT NULL,
+        unit_price DECIMAL(10, 2) NOT NULL,
+        item_status VARCHAR(30) NOT NULL,
+        qr_request_id INT NULL,
+        note VARCHAR(255) NULL,
+        quantity INT NOT NULL,
+        INDEX idx_pi_payment (payment_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+    await addColumn('customer_transactions', 'payment_id', 'INT NULL AFTER order_id');
+    // 1: ödenen ürünleri payment_items'ta kayıtlı tahsilat (geri alınabilir). Eski tahsilatlarda boştur.
+    await addColumn('payments', 'items_tracked', 'TINYINT(1) NULL AFTER notes');
+    // Geri alınan tahsilatlar: ödeme satırı tahsilatlardan çıkarılır (raporlar, gün sonu ve kalan borç kendiliğinden düzelir),
+    // kaydın kendisi neden ve yapan kişiyle burada saklanır
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS payment_reversals (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        payment_id INT NOT NULL,
+        order_id INT NULL,
+        table_id INT NULL,
+        table_title VARCHAR(100) NULL,
+        total_amount DECIMAL(10, 2) NOT NULL,
+        cash_amount DECIMAL(10, 2) DEFAULT 0.00,
+        card_amount DECIMAL(10, 2) DEFAULT 0.00,
+        veresiye_amount DECIMAL(10, 2) DEFAULT 0.00,
+        discount DECIMAL(10, 2) DEFAULT 0.00,
+        tip DECIMAL(10, 2) DEFAULT 0.00,
+        payment_method VARCHAR(50) NOT NULL,
+        customer_id INT NULL,
+        customer_name VARCHAR(150) NULL,
+        paid_at DATETIME NOT NULL,
+        paid_by_user_id INT NULL,
+        items_json LONGTEXT NULL,
+        reason VARCHAR(255) NOT NULL,
+        reversed_by_user_id INT NULL,
+        reversed_by_name VARCHAR(100) NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_pr_order (order_id),
+        INDEX idx_pr_created (created_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
 
     // Not: Eskiden burada her açılışta tüm adisyonlardaki aynı ürün satırları durum/ödeme ayrımı yapılmadan
     // birleştiriliyordu; bu, ikram/iade/iptal ve ödenmiş/ödenmemiş kalemleri karıştırıp satış geçmişini bozuyordu.
@@ -489,7 +544,7 @@ export async function initDatabase() {
         ],
         expense: [
           ['Faturalar', ['Elektrik', 'Su', 'Doğalgaz', 'İnternet', 'Telefon']],
-          ['Personel Giderleri', ['Maaş', 'SGK Primi', 'Avans', 'Prim & İkramiye', 'Yemek & Yol']],
+          ['Personel Giderleri', ['Maaş', 'SGK Primi', 'Avans', 'Prim & İkramiye', 'Bahşiş Ödemesi', 'Yemek & Yol']],
           ['Hammadde & Malzeme', ['Kahve & Çay', 'Süt & Süt Ürünleri', 'Pastane & Tatlı', 'Meşrubat', 'Ambalaj & Sarf']],
           ['Kira & Aidat', ['Dükkan Kirası', 'Aidat', 'Depo Kirası']],
           ['Vergi & Resmi Ödemeler', ['KDV', 'Stopaj', 'Muhtasar', 'Harç & Ceza']],
@@ -573,6 +628,23 @@ export async function initDatabase() {
     const posMainId = await ensureSystemCategory('pos_daily', 'Günlük Ciro (POS)', null, 0);
     await ensureSystemCategory('pos_daily_cash', 'Nakit Tahsilat', posMainId, 1);
     await ensureSystemCategory('pos_daily_card', 'Kartlı Tahsilat', posMainId, 2);
+    // Bahşiş işletmeye kalır; personele dağıtılırsa gider olarak girilir: mevcut kurulumlara alt kategori eklenir
+    await runOnce('cashbook_tip_payout_category_v1', async () => {
+      const [[parent]] = await pool.query(
+        "SELECT id FROM cash_book_categories WHERE entry_type = 'expense' AND parent_id IS NULL AND name = 'Personel Giderleri' LIMIT 1"
+      );
+      if (!parent) return;
+      const [[exists]] = await pool.query("SELECT id FROM cash_book_categories WHERE parent_id = ? AND name = 'Bahşiş Ödemesi'", [parent.id]);
+      if (exists) return;
+      const [[{ next }]] = await pool.query('SELECT COALESCE(MAX(order_num), 0) + 1 AS next FROM cash_book_categories WHERE parent_id = ?', [parent.id]);
+      await pool.query("INSERT INTO cash_book_categories (entry_type, parent_id, name, order_num) VALUES ('expense', ?, 'Bahşiş Ödemesi', ?)", [parent.id, next]);
+    });
+    // Eski gün sonu açıklamaları ("Gün sonu cirosu — ...") hangi güne ait olduğunu da yazacak şekilde güncellenir
+    await runOnce('cashbook_closing_desc_v2', () => pool.query(`
+      UPDATE cash_book_entries
+      SET description = CONCAT(DATE_FORMAT(entry_date, '%d.%m.%Y'), ' günlük ciro (otomatik kayıt) — ', SUBSTRING(description, 19))
+      WHERE source = 'pos_daily' AND description LIKE 'Gün sonu cirosu — %'
+    `));
 
     // QR menü siparişleri: müşterinin masadaki QR ile gönderdiği istek. Personel onaylayınca masanın adisyonuna eklenir.
     // client_session: müşterinin telefonundaki rastgele kimlik (yalnızca kendi siparişlerini görsün diye)

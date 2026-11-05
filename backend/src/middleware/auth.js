@@ -12,7 +12,7 @@ export const ADMIN_SLUG = 'admin';
  */
 export const loadUserProfile = async (userId) => {
   const [users] = await pool.query(
-    `SELECT u.id, u.username, u.name, u.role, u.role_id, u.is_active,
+    `SELECT u.id, u.username, u.name, u.role, u.role_id, u.is_active, u.token_version,
             r.name AS role_name, r.slug AS role_slug, r.color AS role_color, r.max_discount_percent
      FROM users u LEFT JOIN roles r ON r.id = u.role_id
      WHERE u.id = ?`,
@@ -30,6 +30,7 @@ export const loadUserProfile = async (userId) => {
     role_name: u.role_name,
     role_color: u.role_color,
     is_active: Boolean(u.is_active),
+    token_version: Number(u.token_version) || 0,
     max_discount_percent: u.max_discount_percent === null ? null : parseFloat(u.max_discount_percent),
     permissions: perms.map(p => p.permission_key)
   };
@@ -51,6 +52,9 @@ export const deny = (res, keys) => {
   });
 };
 
+/** Oturum, kullanıcının son şifre değişikliğinden önce açıldıysa geçersizdir */
+export const isTokenCurrent = (decoded, user) => (Number(decoded.tv) || 0) === user.token_version;
+
 /** Geçerli oturum ister; req.user'a güncel profil ve yetkileri ekler */
 export const requireAuth = async (req, res, next) => {
   try {
@@ -65,6 +69,9 @@ export const requireAuth = async (req, res, next) => {
     }
     if (!user.is_active) {
       return res.status(401).json({ success: false, code: 'ACCOUNT_DISABLED', message: 'Bu hesap pasife alınmış.' });
+    }
+    if (!isTokenCurrent(decoded, user)) {
+      return res.status(401).json({ success: false, code: 'UNAUTHENTICATED', message: 'Şifre değiştiği için oturum kapandı. Lütfen yeniden giriş yapın.' });
     }
     req.user = user;
     next();

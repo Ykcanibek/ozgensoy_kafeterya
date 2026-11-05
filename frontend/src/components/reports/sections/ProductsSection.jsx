@@ -13,7 +13,7 @@ const MENU_CLASSES = {
 };
 
 const ABC_INFO = {
-  A: 'Cironun ilk %80’ini oluşturan ürünler',
+  A: 'Satışların ilk %80’ini oluşturan ürünler',
   B: 'Sonraki %15',
   C: 'Kalan %5'
 };
@@ -89,7 +89,7 @@ export default function ProductsSection({ data, compareLabel, fileLabel }) {
     { label: 'ABC', value: r => r.abc },
     { label: 'Satılan Adet', value: r => r.qty },
     { label: 'Satış Tutarı (TL)', value: r => r.revenue },
-    { label: 'Ciro Payı (%)', value: r => Math.round(r.share * 10) / 10 },
+    { label: 'Satış Payı (%)', value: r => Math.round(r.share * 10) / 10 },
     ...(hasCmp ? [{ label: `${compareLabel} (TL)`, value: r => r.prev_revenue }] : []),
     { label: 'Ortalama Fiyat (TL)', value: r => r.average_price },
     { label: 'İkram Adet', value: r => r.comp_qty },

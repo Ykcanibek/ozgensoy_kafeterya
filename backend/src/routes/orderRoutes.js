@@ -6,6 +6,12 @@ import {
   updateOrderItemStatus,
   deleteOrderItem,
   closeTablePayment,
+  reversePayment,
+  getOrderReceipt,
+  getPaymentReceipt,
+  getReceiptSettings,
+  updateReceiptSettings,
+  getClosedReceipts,
   getKitchenOrders,
   deliverAllTableItems,
   transferTable
@@ -41,5 +47,19 @@ router.post('/table/:tableId/transfer', requirePermission('pos.transfer'), trans
 
 // Masanın ödemesini al ve masayı kapat — ödeme türü, indirim ve bahşiş yetkileri controller içinde kontrol edilir
 router.post('/table/:tableId/pay', requirePermission('payment.view'), closeTablePayment);
+
+// Açık masada bugün alınan bir tahsilatı nedenini yazarak geri al
+router.post('/payments/:paymentId/reverse', requirePermission('payment.void'), reversePayment);
+
+// Otomatik fiş ayarı (hesap kapanınca fiş penceresi açılsın mı)
+router.get('/receipt-settings', requirePermission('pos.view'), getReceiptSettings);
+router.put('/receipt-settings', requirePermission('payment.print'), updateReceiptSettings);
+
+// Bir günde kapanan hesaplar (unutulan / sonradan istenen fişi yazdırmak için)
+router.get('/closed-receipts', requirePermission('payment.print'), getClosedReceipts);
+
+// Müşteri fişleri: masanın tüm hesabı (kapanınca) ve tek bir ara ödeme
+router.get('/:orderId/receipt', requirePermission('payment.print'), getOrderReceipt);
+router.get('/payments/:paymentId/receipt', requirePermission('payment.print'), getPaymentReceipt);
 
 export default router;

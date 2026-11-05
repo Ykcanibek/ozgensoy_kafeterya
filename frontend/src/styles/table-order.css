@@ -4498,3 +4498,73 @@
 @media (max-width: 420px) {
   .pos-split-row { grid-template-columns: 30px auto minmax(0, 1fr) auto; }
 }
+
+/* Tahsilatı geri alma */
+.pos-payment-history-pill .pill-action {
+  display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; margin-left: 2px;
+  border: 0; border-radius: 6px; background: transparent; cursor: pointer;
+}
+.pos-payment-history-pill .pill-print { color: #346c80; }
+.pos-payment-history-pill .pill-print:hover { background: #e3eff3; }
+.pos-payment-history-pill .pill-reverse { color: #b3261e; }
+.pos-payment-history-pill .pill-reverse:hover { background: #fdecea; }
+.pos-reverse-modal { max-width: 440px; }
+.pos-reverse-modal h4 { display: inline-flex; align-items: center; gap: 6px; }
+.pos-reverse-summary { display: flex; align-items: baseline; gap: 10px; margin: 12px 0 8px; }
+.pos-reverse-summary strong { font-size: 1.3rem; color: #1b414f; }
+.pos-reverse-summary span { font-size: 0.8rem; color: #486b78; font-weight: 600; }
+.pos-reverse-items { font-size: 0.82rem; color: #324f5a; background: #f4f8f9; border-radius: 10px; padding: 8px 12px; }
+.pos-reverse-items ul { margin: 6px 0 0; padding: 0; list-style: none; }
+.pos-reverse-items li { display: flex; justify-content: space-between; padding: 2px 0; font-weight: 700; }
+.pos-reverse-items li em { font-style: normal; color: #486b78; }
+.pos-reverse-note { margin: 8px 0 0; font-size: 0.78rem; color: #5d818f; }
+.pos-reverse-reason { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; font-size: 0.8rem; font-weight: 700; color: #1b414f; }
+.pos-reverse-reason b { color: #b3261e; }
+.pos-reverse-reason textarea {
+  font-family: inherit; font-size: 0.88rem; border: 1.5px solid #b6ced6; border-radius: 8px; padding: 8px 10px; resize: vertical;
+}
+.pos-reverse-reason textarea:focus { outline: none; border-color: #346c80; }
+.pos-reverse-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.pos-reverse-chips button {
+  border: 1px solid #cfdde3; background: #fff; color: #324f5a; border-radius: 999px; padding: 4px 10px;
+  font-size: 0.74rem; font-weight: 700; cursor: pointer;
+}
+.pos-reverse-chips button.active, .pos-reverse-chips button:hover { border-color: #346c80; background: #e9f2f5; }
+.pos-reverse-actions { display: flex; gap: 10px; margin-top: 16px; }
+.pos-btn-split-opt.danger { background: #b3261e; border-color: #b3261e; color: #fff; }
+.pos-btn-split-opt.danger:hover:not(:disabled) { background: #8f1d17; }
+
+/* Masalar ekranı: kapanan hesapların fişleri */
+.pos-receipts-btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border-radius: 10px; white-space: nowrap;
+  font-family: inherit; font-size: 0.82rem; font-weight: 700; cursor: pointer;
+  border: 1.5px solid #b6ced6; background: #ffffff; color: #1b414f;
+}
+.pos-receipts-btn:hover { background: #e9f2f5; border-color: #346c80; }
+.pos-closed-receipts { max-width: 560px; width: 94%; display: flex; flex-direction: column; max-height: 82vh; }
+.pos-closed-receipts h4 { display: inline-flex; align-items: center; gap: 6px; }
+.pos-cr-toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 8px; }
+.pos-cr-days { display: inline-flex; gap: 4px; align-items: center; }
+.pos-cr-days button, .pos-cr-days input {
+  font-family: inherit; font-size: 0.8rem; font-weight: 700; border: 1px solid #cfdde3; background: #fff; color: #324f5a;
+  border-radius: 8px; padding: 5px 10px; cursor: pointer;
+}
+.pos-cr-days button.active { background: #346c80; border-color: #346c80; color: #fff; }
+.pos-cr-search { flex: 1; min-width: 160px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid #cfdde3; border-radius: 8px; padding: 0 8px; color: #6b8590; }
+.pos-cr-search input { flex: 1; min-width: 0; border: 0; outline: none; font-family: inherit; font-size: 0.84rem; padding: 6px 0; }
+.pos-cr-error { padding: 8px 10px; border-radius: 8px; background: #fdecea; color: #8f1d17; font-size: 0.8rem; font-weight: 700; margin-bottom: 6px; }
+.pos-cr-list { overflow-y: auto; border: 1px solid #e2ecf0; border-radius: 10px; min-height: 120px; }
+.pos-cr-empty { padding: 26px 12px; text-align: center; color: #6b8590; font-size: 0.84rem; font-weight: 600; }
+.pos-cr-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid #edf3f5; }
+.pos-cr-row:last-child { border-bottom: 0; }
+.pos-cr-time { font-size: 0.8rem; font-weight: 800; color: #486b78; width: 42px; flex: none; }
+.pos-cr-table { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pos-cr-table strong { font-size: 0.88rem; color: #1b414f; }
+.pos-cr-table em { font-style: normal; font-size: 0.74rem; color: #6b8590; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pos-cr-total { font-weight: 800; color: #1b414f; font-size: 0.9rem; flex: none; }
+.pos-cr-print {
+  display: inline-flex; align-items: center; gap: 4px; flex: none; border: 1px solid #346c80; background: #346c80; color: #fff;
+  border-radius: 8px; padding: 5px 10px; font-family: inherit; font-size: 0.78rem; font-weight: 700; cursor: pointer;
+}
+.pos-cr-print:hover:not(:disabled) { background: #265464; }
+.pos-cr-print:disabled { opacity: 0.6; cursor: wait; }

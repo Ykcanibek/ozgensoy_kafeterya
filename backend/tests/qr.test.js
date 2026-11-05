@@ -42,6 +42,15 @@ test('geçersiz ya da kaldırılmış masanın QR kodu açılmaz', async () => {
   assert.equal((await pub('GET', `/menu/${token}`)).status, 404, 'kaldırılan masanın QR kodu çalışmamalı');
 });
 
+test('masasız menü incelenir ama sipariş alınmaz', async () => {
+  const browse = await pub('GET', '/menu');
+  assert.equal(browse.status, 200);
+  assert.equal(browse.table, null);
+  assert.equal(browse.ordering_enabled, false, 'QR siparişi açıkken bile masasız menüde sipariş kapalı');
+  assert.ok(browse.products.length > 0);
+  assert.equal((await pub('POST', '/menu', { items: [] })).status, 401, 'masasız sipariş uç noktası yok');
+});
+
 test('müşteri menüyü görür, sipariş verir; personel onaylayınca mutfağa düşer ve müşteri durumu görür', async () => {
   const table = tables[0];
   const menu = await pub('GET', `/menu/${table.qr_code_token}`);

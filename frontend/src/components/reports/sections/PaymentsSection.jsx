@@ -10,9 +10,9 @@ export default function PaymentsSection({ data, compareLabel, onZReport }) {
   const prev = (key) => (cmp ? cmp[key]?.previous : undefined);
 
   // Mutabakat: satış (kapanışa göre) ile tahsilat (ödeme zamanına göre) karşılaştırması
-  const collectedForSales = c.cash + c.card + c.veresiye - c.tip - c.account_collections;
+  const collectedForSales = c.cash + c.card + c.veresiye - c.account_collections;
   const explained = collectedForSales + sales.unpaid_closed;
-  const diff = Math.round((sales.net - explained) * 100) / 100;
+  const diff = Math.round((sales.revenue - explained) * 100) / 100;
 
   const methods = [
     { key: 'cash', label: 'Nakit', Icon: Banknote, value: c.cash, count: c.counts.cash },
@@ -31,7 +31,7 @@ export default function PaymentsSection({ data, compareLabel, onZReport }) {
       <div className="rh-kpi-row">
         <Kpi Icon={Wallet} label="Kasaya giren" value={money(c.drawer_total)} sub="Nakit + kart" current={c.drawer_total} previous={prev('drawer_total')} />
         <Kpi Icon={NotebookPen} label="Veresiye yazılan" value={money(c.veresiye)} current={c.veresiye} previous={prev('veresiye')} inverse />
-        <Kpi Icon={HandCoins} label="Bahşiş" value={money(c.tip)} sub="Kasaya girenin içinde" />
+        <Kpi Icon={HandCoins} label="Bahşiş" value={money(c.tip)} sub="Kasaya girenin içinde · işletme geliri" hint="Bahşiş işletmeye kalır ve kasa defterine ciroyla birlikte işlenir. Personele dağıtılırsa kasa defterine Personel Giderleri › Bahşiş Ödemesi olarak girin." />
         <Kpi Icon={UserCheck} label="Cari tahsilat" value={money(c.account_collections)} sub="Eski borç ödemeleri" hint="Müşterilerin veresiye borçları için yaptığı ödemeler (adisyon dışı)" />
       </div>
 
@@ -51,15 +51,14 @@ export default function PaymentsSection({ data, compareLabel, onZReport }) {
           {c.counts.mixed > 0 && <Note>Parçalı ödemelerin nakit ve kart kısımları ilgili türlere eklenmiştir.</Note>}
         </Card>
 
-        <Card title="Satış ↔ tahsilat mutabakatı" subtitle="Net satışın nereye gittiği">
+        <Card title="Satış ↔ tahsilat mutabakatı" subtitle="Net cironun nereye gittiği">
           <dl className="rh-recon">
-            <div><dt>Net satış</dt><dd>{money(sales.net)}</dd></div>
+            <div><dt>Net ciro</dt><dd>{money(sales.revenue)}</dd></div>
             <div className="sub"><dt>Nakit</dt><dd>{money(c.cash)}</dd></div>
             <div className="sub"><dt>Kredi kartı</dt><dd>{money(c.card)}</dd></div>
             <div className="sub"><dt>Veresiye</dt><dd>{money(c.veresiye)}</dd></div>
-            <div className="sub minus"><dt>Bahşiş (satış değil)</dt><dd>− {money(c.tip)}</dd></div>
             <div className="sub minus"><dt>Cari tahsilat (eski borç)</dt><dd>− {money(c.account_collections)}</dd></div>
-            <div className="sub"><dt>Tahsilsiz kapatılan</dt><dd>{money(sales.unpaid_closed)}</dd></div>
+            {sales.unpaid_closed > 0 && <div className="sub"><dt>Tahsilsiz kapatılan</dt><dd>{money(sales.unpaid_closed)}</dd></div>}
             <div className={`total ${diff ? 'warn' : 'ok'}`}>
               <dt>{diff ? 'Açıklanamayan fark' : 'Fark yok'}</dt>
               <dd>{money(diff)}</dd>

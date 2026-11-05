@@ -15,7 +15,8 @@ import {
   ShieldCheck,
   UserCheck,
   PackageX,
-  BookOpen
+  BookOpen,
+  DatabaseBackup
 } from 'lucide-react';
 
 export default function Sidebar({ isOpen, onClose }) {
@@ -34,6 +35,7 @@ export default function Sidebar({ isOpen, onClose }) {
     { path: '/raporlar', label: 'Gün Sonu & Raporlar', icon: <BarChart3 size={18} /> },
     { path: '/personel', label: 'Personel Yönetimi', icon: <UserCheck size={18} /> },
     { path: '/yetkiler', label: 'Yetki & Rol Yönetimi', icon: <ShieldCheck size={18} /> },
+    { path: '/yedekler', label: 'Yedekler', icon: <DatabaseBackup size={18} /> },
   ].filter(item => canAny(pagePermissions(item.path))); // Yalnızca yetkili olunan sayfalar
 
   if (!isOpen) return null;

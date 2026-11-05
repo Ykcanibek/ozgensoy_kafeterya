@@ -44,6 +44,12 @@ export default function CustomerReceiptPrintModal({
                 </div>
               </div>
 
+              {printingReceipt.receipt.title && (
+                <div style={{ textAlign: 'center', fontSize: '0.8rem', fontWeight: 900, letterSpacing: '0.5px', color: '#000000', marginTop: '4px' }}>
+                  {printingReceipt.receipt.title}
+                </div>
+              )}
+
               <div className="pos-paper-divider" style={{ borderTop: '1.5px dashed #000000', margin: '8px 0' }}></div>
 
               {/* Sadeleştirilmiş Üst Bilgiler (2-3 Kompakt Satır) */}
@@ -53,8 +59,7 @@ export default function CustomerReceiptPrintModal({
                   <span>Fiş: <strong>#{printingReceipt.receipt.id}</strong></span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Masa: {printingReceipt.receipt.table_title || 'Masa'}{printingReceipt.receipt.table_number ? ` (${printingReceipt.receipt.table_number})` : ''}</span>
-                  <span>Personel: {printingReceipt.receipt.closed_by_user_name?.split(' ')[0] || 'Kasiyer'}</span>
+                  <span>Masa: {printingReceipt.receipt.table_title || 'Masa'}</span>
                 </div>
                 {printingReceipt.receipt.customer_name && (
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -75,7 +80,7 @@ export default function CustomerReceiptPrintModal({
 
                 {printingReceipt.items.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '8px 0', color: '#000000', fontWeight: 700, fontSize: '0.82rem' }}>
-                    Kasa Tahsilatı
+                    {printingReceipt.empty_label || 'Kasa Tahsilatı'}
                   </div>
                 ) : (
                   printingReceipt.items.map((it, idx) => (

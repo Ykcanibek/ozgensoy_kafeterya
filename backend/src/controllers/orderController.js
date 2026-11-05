@@ -3,6 +3,8 @@ import { pool } from '../config/db.js';
 import { getUserFromReq, logActivity } from '../config/auditLogger.js';
 import { formatTitleCase } from './customerController.js';
 import { can, canAny, deny } from '../middleware/auth.js';
+import { isAutoReceiptEnabled, setSetting } from '../config/settings.js';
+import { todayStr } from '../services/dailyClosing.js';
 
 // Tek kalemde girilebilecek en yüksek adet
 const MAX_ITEM_QTY = 999;
@@ -15,6 +17,7 @@ const LOSS_STATUSES = ['cancelled', 'returned', 'complimentary'];
  * Yalnızca durumu, birim fiyatı ve QR isteği aynı olan satırlar birleşir: ikram/iade/iptal kalemleri
  * satışa dönüşmez (raporlar bozulmaz), fiyatı değişmiş ürün yanlış birim fiyatla görünmez,
  * QR müşterisi kendi siparişinin durumunu görmeye devam eder.
+ * Hangi tahsilatın hangi üründen kaç adet ödediği ayrıca payment_items'ta tutulur (tahsilat geri alınabilsin diye).
  */
 export const mergePaidOrderItems = async (connectionOrPool, orderId = null) => {
   const query = `
@@ -174,6 +177,7 @@ export const getTableOrder = async (req, res) => {
         p.customer_name,
         p.notes,
         p.created_at,
+        (DATE(p.created_at) = CURDATE() AND p.items_tracked = 1) AS reversible,
         u.name AS closed_by_name
        FROM payments p
        LEFT JOIN users u ON p.closed_by_user_id = u.id
@@ -181,6 +185,18 @@ export const getTableOrder = async (req, res) => {
        ORDER BY p.id ASC`,
       [order.id, tableId, order.created_at]
     );
+    // Ürün seçilerek alınan tahsilatlarda hangi ürünlerin ödendiği (tahsilatı geri alma penceresinde gösterilir)
+    if (payments.length) {
+      const [parts] = await pool.query(
+        `SELECT pi.payment_id, pi.quantity, pi.unit_price, p.name AS product_name
+         FROM payment_items pi JOIN products p ON p.id = pi.product_id WHERE pi.payment_id IN (?) ORDER BY pi.id`,
+        [payments.map(pm => pm.id)]
+      );
+      payments.forEach(pm => {
+        pm.items = parts.filter(x => x.payment_id === pm.id)
+          .map(x => ({ product_name: x.product_name, quantity: x.quantity, total_price: x.quantity * Number(x.unit_price) }));
+      });
+    }
 
     res.json({
       success: true,
@@ -653,6 +669,7 @@ export const closeTablePayment = async (req, res) => {
     // 3. Kalem Bazlı veya Tutar Bazlı Tahsilat Belirleme
     const hasItemSelection = Array.isArray(paid_items) && paid_items.length > 0;
     let computedPaidAmount = 0;
+    const paidParts = []; // Bu tahsilatla ödenen ürün/adetler (tahsilat kaydı oluşunca payment_items'a yazılır)
 
     if (hasItemSelection) {
       // Kalem bazlı ödeme: Seçilen ürünleri ve adetlerini işle
@@ -678,6 +695,7 @@ export const closeTablePayment = async (req, res) => {
           const payQty = Math.min(item.quantity, reqQty);
           const lineTotal = payQty * parseFloat(item.unit_price);
           computedPaidAmount += lineTotal;
+          paidParts.push([item.order_id, item.product_id, item.unit_price, item.item_status, item.qr_request_id, item.note, payQty]);
 
           if (payQty >= item.quantity) {
             // Kalemin tamamı ödendi
@@ -858,13 +876,14 @@ export const closeTablePayment = async (req, res) => {
     }
 
     // Veresiye tutarı varsa müşteriye borç kaydet
+    let debtTransactionId = null;
     if (veresiyePortion > 0 && resolvedCustomerId) {
       await connection.query(
         'UPDATE customers SET total_debt = total_debt + ?, current_balance = current_balance + ? WHERE id = ?',
         [veresiyePortion, veresiyePortion, resolvedCustomerId]
       );
 
-      await connection.query(
+      const [debtRes] = await connection.query(
         `INSERT INTO customer_transactions (
           customer_id, transaction_type, amount, order_id, table_id, table_title,
           payment_method, cash_amount, card_amount, veresiye_amount, discount, tip, notes,
@@ -887,14 +906,25 @@ export const closeTablePayment = async (req, res) => {
           user.name
         ]
       );
+      debtTransactionId = debtRes.insertId;
     }
 
     // 5. Ödeme Fişi / Tahsilat Kaydını Oluştur (order_id, cash_amount, card_amount, veresiye_amount ve müşteri adı/id ile)
     const [payResult] = await connection.query(
-      `INSERT INTO payments (table_id, order_id, total_amount, cash_amount, card_amount, veresiye_amount, discount, tip, payment_method, customer_id, customer_name, notes, closed_by_user_id) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO payments (table_id, order_id, total_amount, cash_amount, card_amount, veresiye_amount, discount, tip, payment_method, customer_id, customer_name, notes, items_tracked, closed_by_user_id) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
       [tableId, primaryOrder.id, paidAmount, cashPortion, cardPortion, veresiyePortion, discountVal, tipVal, validMethod, resolvedCustomerId, customerName, notesVal, closedUserId]
     );
+    const paymentId = payResult.insertId;
+    if (paidParts.length) {
+      await connection.query(
+        'INSERT INTO payment_items (order_id, product_id, unit_price, item_status, qr_request_id, note, quantity, payment_id) VALUES ?',
+        [paidParts.map(p => [...p, paymentId])]
+      );
+    }
+    if (debtTransactionId) {
+      await connection.query('UPDATE customer_transactions SET payment_id = ? WHERE id = ?', [paymentId, debtTransactionId]);
+    }
 
     // 5. Masada Kalan Toplam Borcu ve Kapanış Durumunu Kontrol Et
     // Masadan düşen ürün tutarı = (Tahsil Edilen Tutar - Bahşiş + İndirim)
@@ -1001,7 +1031,9 @@ export const closeTablePayment = async (req, res) => {
         : `₺${paidAmount.toFixed(2)} tutarında kısmi ödeme alındı. Kalan masa borcu: ₺${newRemainingBalance.toFixed(2)}`,
       totalAmount: paidAmount,
       remainingBalance: newRemainingBalance,
-      paymentMethod: validMethod
+      paymentMethod: validMethod,
+      orderId: primaryOrder.id,
+      paymentId
     });
   } catch (error) {
     await connection.rollback();
@@ -1635,3 +1667,334 @@ export const deliverAllTableItems = async (req, res) => {
 };
 
 
+
+/**
+ * Tahsilatı geri al: açık masada bugün alınan bir tahsilat yanlış alındıysa (yanlış ürünler seçildi, yanlış tutar vb.).
+ * Tahsilat satırı tahsilatlardan çıkarılır, kaydı neden ve yapan kişiyle payment_reversals'ta saklanır; bu tahsilatla
+ * ödenen kalemler tekrar ödenmemiş olur, veresiye kısmı müşterinin borcundan düşülür. Raporlar, gün sonu cirosu ve
+ * masanın kalan borcu tahsilatlardan hesaplandığı için kendiliğinden düzelir.
+ * Hesabı kapanmış masalar ve geçmiş günler değiştirilemez (o günün cirosu kasa defterine işlenmiş olabilir).
+ */
+export const reversePayment = async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    const user = getUserFromReq(req);
+    const paymentId = Number(req.params.paymentId);
+    const reason = String(req.body?.reason ?? '').trim().slice(0, 255);
+    if (!Number.isInteger(paymentId) || paymentId <= 0) {
+      return res.status(400).json({ success: false, message: 'Geçersiz tahsilat.' });
+    }
+    if (reason.length < 3) {
+      return res.status(400).json({ success: false, message: 'Geri alma nedenini yazın (en az 3 karakter).' });
+    }
+
+    await connection.beginTransaction();
+    const [[pay]] = await connection.query(
+      'SELECT p.*, DATE(p.created_at) = CURDATE() AS is_today FROM payments p WHERE p.id = ? FOR UPDATE', [paymentId]
+    );
+    if (!pay) throw new OrderError(404, 'Tahsilat bulunamadı; daha önce geri alınmış olabilir. Adisyonu yenileyin.');
+    if (!pay.order_id) throw new OrderError(400, 'Cari hesap tahsilatları buradan geri alınamaz.');
+    const [[order]] = await connection.query('SELECT id, status, table_id FROM orders WHERE id = ? FOR UPDATE', [pay.order_id]);
+    if (!order || ['completed', 'cancelled'].includes(order.status)) {
+      throw new OrderError(400, 'Hesabı kapanmış masanın tahsilatı geri alınamaz.');
+    }
+    if (!Number(pay.is_today)) throw new OrderError(400, 'Yalnızca bugün alınan tahsilatlar geri alınabilir.');
+    if (!pay.items_tracked) {
+      throw new OrderError(400, 'Bu tahsilat, geri alma özelliğinden önce alındığı için hangi ürünlerin ödendiği bilinmiyor; geri alınamaz.');
+    }
+
+    const tableId = pay.table_id || order.table_id;
+    const [[tableRow]] = await connection.query('SELECT title FROM restaurant_tables WHERE id = ?', [tableId]);
+    const tableTitle = tableRow?.title || `Masa ${tableId}`;
+
+    // Veresiye kısmı: müşterinin borcundan düşülür, borç hareketi silinir
+    const veresiye = Number(pay.veresiye_amount) || 0;
+    if (veresiye > 0 && pay.customer_id) {
+      const [[debt]] = await connection.query(
+        "SELECT id FROM customer_transactions WHERE payment_id = ? AND transaction_type = 'debt' FOR UPDATE", [paymentId]
+      );
+      if (!debt) {
+        throw new OrderError(400, 'Bu veresiye tahsilatı geri alınamıyor (eski kayıt). Müşterinin cari hesabından düzeltin.');
+      }
+      await connection.query(
+        'UPDATE customers SET total_debt = total_debt - ?, current_balance = current_balance - ? WHERE id = ?',
+        [veresiye, veresiye, pay.customer_id]
+      );
+      await connection.query('DELETE FROM customer_transactions WHERE id = ?', [debt.id]);
+    }
+
+    // Bu tahsilatla ödenen adetler tekrar ödenmemiş olur. Adisyonda aynı ürünün ödenen satırları birleşik durduğu için
+    // ödenmiş satırdan o adet düşülür ve ödenmemiş satır olarak geri eklenir.
+    const [parts] = await connection.query(
+      `SELECT pi.*, p.name AS product_name FROM payment_items pi JOIN products p ON p.id = pi.product_id
+       WHERE pi.payment_id = ? ORDER BY pi.id`,
+      [paymentId]
+    );
+    const items = [];
+    for (const part of parts) {
+      const [[paidRow]] = await connection.query(
+        `SELECT id, quantity, unit_price, created_by_user_id FROM order_items
+         WHERE order_id = ? AND product_id = ? AND unit_price = ? AND item_status = ? AND (qr_request_id <=> ?) AND is_paid = 1
+         ORDER BY quantity DESC LIMIT 1 FOR UPDATE`,
+        [part.order_id, part.product_id, part.unit_price, part.item_status, part.qr_request_id]
+      );
+      if (!paidRow || paidRow.quantity < part.quantity) {
+        throw new OrderError(409, `Adisyon bu tahsilattan sonra değişmiş (${part.product_name}); tahsilat geri alınamıyor.`);
+      }
+      const price = parseFloat(part.unit_price);
+      // Ödeme sırasında bölünen satırın ödenmemiş kalan kısmı duruyorsa açılan adet ona eklenir (adisyon eski hâline döner)
+      const [[openRow]] = await connection.query(
+        `SELECT id, quantity FROM order_items
+         WHERE order_id = ? AND product_id = ? AND unit_price = ? AND item_status = ? AND (qr_request_id <=> ?) AND (note <=> ?)
+           AND COALESCE(is_paid, 0) = 0
+         ORDER BY id LIMIT 1 FOR UPDATE`,
+        [part.order_id, part.product_id, part.unit_price, part.item_status, part.qr_request_id, part.note]
+      );
+      if (openRow) {
+        const merged = openRow.quantity + part.quantity;
+        await connection.query('UPDATE order_items SET quantity = ?, total_price = ? WHERE id = ?', [merged, merged * price, openRow.id]);
+      }
+      if (paidRow.quantity === part.quantity) {
+        if (openRow) await connection.query('DELETE FROM order_items WHERE id = ?', [paidRow.id]);
+        else await connection.query('UPDATE order_items SET is_paid = 0, note = ? WHERE id = ?', [part.note, paidRow.id]);
+      } else {
+        const keep = paidRow.quantity - part.quantity;
+        await connection.query('UPDATE order_items SET quantity = ?, total_price = ? WHERE id = ?', [keep, keep * price, paidRow.id]);
+        if (!openRow) {
+          await connection.query(
+            `INSERT INTO order_items (order_id, product_id, quantity, unit_price, total_price, item_status, is_paid, note, created_by_user_id, qr_request_id)
+             VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+            [part.order_id, part.product_id, part.quantity, price, part.quantity * price, part.item_status, part.note, paidRow.created_by_user_id, part.qr_request_id]
+          );
+        }
+      }
+      items.push({ product_name: part.product_name, quantity: part.quantity, total_price: part.quantity * price });
+    }
+    await connection.query('DELETE FROM payment_items WHERE payment_id = ?', [paymentId]);
+
+    await connection.query(
+      `INSERT INTO payment_reversals (payment_id, order_id, table_id, table_title, total_amount, cash_amount, card_amount,
+         veresiye_amount, discount, tip, payment_method, customer_id, customer_name, paid_at, paid_by_user_id, items_json,
+         reason, reversed_by_user_id, reversed_by_name)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [paymentId, pay.order_id, tableId, tableTitle, pay.total_amount, pay.cash_amount, pay.card_amount,
+        pay.veresiye_amount, pay.discount, pay.tip, pay.payment_method, pay.customer_id, pay.customer_name,
+        pay.created_at, pay.closed_by_user_id,
+        JSON.stringify(items.map(i => ({ product: i.product_name, qty: i.quantity, total: Number(i.total_price) }))),
+        reason, user.id, user.name]
+    );
+    await connection.query('DELETE FROM payments WHERE id = ?', [paymentId]);
+    const remaining = await recalcOrderTotal(connection, pay.order_id);
+    await connection.commit();
+
+    const amount = Number(pay.total_amount);
+    const itemText = items.length ? items.map(i => `${i.quantity}× ${i.product_name}`).join(', ') : 'tutar bazlı tahsilat (ürün seçilmemişti)';
+    await logActivity({
+      userId: user.id,
+      userName: user.name,
+      entityType: 'payment',
+      entityId: paymentId,
+      actionType: 'payment_reversed',
+      title: `Tahsilat Geri Alındı: ${tableTitle} (₺${amount.toFixed(2)})`,
+      details: `${user.name} tarafından geri alındı. Neden: ${reason}. Tekrar ödenmemiş olan: ${itemText}. Masanın kalan borcu: ₺${remaining.toFixed(2)}`,
+      amount,
+      tableTitle
+    });
+
+    req.io?.emit('table:updated', { tableId: Number(tableId), status: 'occupied', active_total: remaining });
+    req.io?.emit('order:updated', { tableId: Number(tableId) });
+    req.io?.emit('payment:reversed', { tableId: Number(tableId), paymentId, amount });
+    req.io?.emit('cashbook:changed', {});
+    if (pay.customer_id) req.io?.emit('customer:updated', { customerId: pay.customer_id });
+
+    res.json({ success: true, message: `Tahsilat geri alındı (₺${amount.toFixed(2)}). Masanın kalan borcu: ₺${remaining.toFixed(2)}`, remaining, reopened_items: items.length });
+  } catch (error) {
+    await connection.rollback().catch(() => {});
+    if (error instanceof OrderError) return res.status(error.status).json({ success: false, message: error.message });
+    console.error('Tahsilat geri alma hatası:', error);
+    res.status(500).json({ success: false, message: 'Tahsilat geri alınamadı.' });
+  } finally {
+    connection.release();
+  }
+};
+
+// Müşteri fişi: yazdırma penceresinin beklediği biçim ({ receipt, items })
+const LOSS_LABELS = { complimentary: 'İkram', returned: 'İade' };
+const receiptItems = (rows) => rows
+  .filter(r => r.item_status !== 'cancelled')
+  .map(r => (LOSS_LABELS[r.item_status]
+    ? { product_name: `${r.product_name} (${LOSS_LABELS[r.item_status]})`, quantity: Number(r.quantity), total_price: 0 }
+    : { product_name: r.product_name, quantity: Number(r.quantity), total_price: Number(r.total_price) }));
+
+/** Masanın tüm hesabının fişi (hesap kapanınca yazdırılır; kapanmış adisyon için de çalışır) */
+export const getOrderReceipt = async (req, res) => {
+  try {
+    const orderId = Number(req.params.orderId);
+    const [[order]] = await pool.query(
+      `SELECT o.id, o.created_at, o.closed_at, t.title AS table_title, t.table_number
+       FROM orders o LEFT JOIN restaurant_tables t ON t.id = o.table_id WHERE o.id = ?`,
+      [orderId]
+    );
+    if (!order) return res.status(404).json({ success: false, message: 'Adisyon bulunamadı.' });
+    // Aynı ürünün satırları fişte tek satırda toplanır
+    const [rows] = await pool.query(
+      `SELECT p.name AS product_name, oi.item_status, SUM(oi.quantity) AS quantity, SUM(oi.total_price) AS total_price
+       FROM order_items oi JOIN products p ON p.id = oi.product_id
+       WHERE oi.order_id = ? GROUP BY oi.product_id, p.name, oi.unit_price, oi.item_status ORDER BY MIN(oi.id)`,
+      [orderId]
+    );
+    const [pays] = await pool.query(
+      `SELECT p.*, u.name AS closed_by_name FROM payments p LEFT JOIN users u ON u.id = p.closed_by_user_id
+       WHERE p.order_id = ? ORDER BY p.id`,
+      [orderId]
+    );
+    const sum = (k) => Math.round(pays.reduce((s, p) => s + Number(p[k] || 0), 0) * 100) / 100;
+    const methods = new Set(pays.map(p => p.payment_method));
+    res.json({
+      success: true,
+      receipt: {
+        id: order.id,
+        title: null,
+        table_title: order.table_title,
+        table_number: order.table_number,
+        created_at: order.closed_at || pays[pays.length - 1]?.created_at || order.created_at,
+        closed_by_user_name: pays[pays.length - 1]?.closed_by_name || null,
+        customer_name: pays.find(p => p.customer_name)?.customer_name || null,
+        payment_method: methods.size === 1 ? [...methods][0] : 'mixed',
+        cash_amount: sum('cash_amount'),
+        card_amount: sum('card_amount'),
+        veresiye_amount: sum('veresiye_amount'),
+        discount: sum('discount'),
+        tip: sum('tip'),
+        total_amount: sum('total_amount'),
+        payment_count: pays.length
+      },
+      items: receiptItems(rows)
+    });
+  } catch (error) {
+    console.error('Hesap fişi hatası:', error);
+    res.status(500).json({ success: false, message: 'Fiş hazırlanamadı.' });
+  }
+};
+
+/** Tek bir (ara) ödemenin fişi: yalnızca o tahsilatla ödenen ürünler */
+export const getPaymentReceipt = async (req, res) => {
+  try {
+    const paymentId = Number(req.params.paymentId);
+    const [[pay]] = await pool.query(
+      `SELECT p.*, u.name AS closed_by_name, t.title AS table_title, t.table_number
+       FROM payments p LEFT JOIN users u ON u.id = p.closed_by_user_id LEFT JOIN restaurant_tables t ON t.id = p.table_id
+       WHERE p.id = ?`,
+      [paymentId]
+    );
+    if (!pay) return res.status(404).json({ success: false, message: 'Tahsilat bulunamadı.' });
+    const [rows] = await pool.query(
+      `SELECT p.name AS product_name, pi.item_status, SUM(pi.quantity) AS quantity, SUM(pi.quantity * pi.unit_price) AS total_price
+       FROM payment_items pi JOIN products p ON p.id = pi.product_id
+       WHERE pi.payment_id = ? GROUP BY pi.product_id, p.name, pi.unit_price, pi.item_status ORDER BY MIN(pi.id)`,
+      [paymentId]
+    );
+    res.json({
+      success: true,
+      receipt: {
+        id: `${pay.order_id || ''}-${pay.id}`,
+        title: 'ARA ÖDEME FİŞİ',
+        table_title: pay.table_title,
+        table_number: pay.table_number,
+        created_at: pay.created_at,
+        closed_by_user_name: pay.closed_by_name,
+        customer_name: pay.customer_name,
+        payment_method: pay.payment_method,
+        cash_amount: Number(pay.cash_amount),
+        card_amount: Number(pay.card_amount),
+        veresiye_amount: Number(pay.veresiye_amount),
+        discount: Number(pay.discount),
+        tip: Number(pay.tip),
+        total_amount: Number(pay.total_amount)
+      },
+      items: receiptItems(rows),
+      // Ürün seçilmeden tutar olarak alınan ödemede fişte ürün listesi yerine bu yazı çıkar
+      empty_label: rows.length ? null : 'Ara ödeme (tutar)'
+    });
+  } catch (error) {
+    console.error('Ödeme fişi hatası:', error);
+    res.status(500).json({ success: false, message: 'Fiş hazırlanamadı.' });
+  }
+};
+
+/** Otomatik fiş ayarı: hesap kapanınca fiş yazdırma penceresi açılsın mı (yazıcı bozukken, istenmediğinde kapatılır) */
+export const getReceiptSettings = async (req, res) => {
+  try {
+    res.json({ success: true, auto_receipt: await isAutoReceiptEnabled() });
+  } catch (error) {
+    console.error('Fiş ayarı hatası:', error);
+    res.status(500).json({ success: false, message: 'Fiş ayarı alınamadı.' });
+  }
+};
+
+export const updateReceiptSettings = async (req, res) => {
+  try {
+    const user = getUserFromReq(req);
+    if (typeof req.body?.auto_receipt !== 'boolean') {
+      return res.status(400).json({ success: false, message: 'Geçersiz ayar.' });
+    }
+    const enabled = req.body.auto_receipt;
+    await setSetting('auto_receipt_enabled', enabled ? '1' : '0', user.id);
+    await logActivity({
+      userId: user.id,
+      userName: user.name,
+      entityType: 'settings',
+      entityId: null,
+      actionType: enabled ? 'auto_receipt_enabled' : 'auto_receipt_disabled',
+      title: enabled ? 'Otomatik Fiş Açıldı' : 'Otomatik Fiş Kapatıldı',
+      details: `${user.name} tarafından hesap kapanınca fiş penceresinin açılması ${enabled ? 'açıldı' : 'kapatıldı'}.`
+    });
+    req.io?.emit('receipt:settings', { auto_receipt: enabled });
+    res.json({
+      success: true,
+      auto_receipt: enabled,
+      message: enabled
+        ? 'Otomatik fiş açıldı: hesap kapanınca fiş yazdırma penceresi açılacak.'
+        : 'Otomatik fiş kapatıldı. Gerekirse fişi ödeme geçmişindeki yazıcı düğmesinden yazdırabilirsiniz.'
+    });
+  } catch (error) {
+    console.error('Fiş ayarı güncelleme hatası:', error);
+    res.status(500).json({ success: false, message: 'Fiş ayarı değiştirilemedi.' });
+  }
+};
+
+/** Bir günde kapanan hesaplar (masalar ekranındaki "Fişler" penceresi: unutulan ya da sonradan istenen fişi yazdırmak için) */
+export const getClosedReceipts = async (req, res) => {
+  try {
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(req.query.date || '') ? req.query.date : todayStr();
+    const [rows] = await pool.query(
+      `SELECT o.id, o.closed_at, t.title AS table_title,
+              COALESCE(SUM(p.total_amount), 0) AS total_amount, COUNT(p.id) AS payment_count,
+              GROUP_CONCAT(DISTINCT p.payment_method) AS methods,
+              MAX(p.customer_name) AS customer_name
+       FROM orders o
+       LEFT JOIN restaurant_tables t ON t.id = o.table_id
+       LEFT JOIN payments p ON p.order_id = o.id
+       WHERE o.status = 'completed' AND o.closed_at >= ? AND o.closed_at < ? + INTERVAL 1 DAY
+       GROUP BY o.id, o.closed_at, t.title
+       ORDER BY o.closed_at DESC, o.id DESC
+       LIMIT 300`,
+      [date, date]
+    );
+    res.json({
+      success: true,
+      receipts: rows.map(r => ({
+        order_id: r.id,
+        closed_at: r.closed_at,
+        table_title: r.table_title,
+        total_amount: Number(r.total_amount),
+        payment_count: Number(r.payment_count),
+        methods: r.methods ? r.methods.split(',') : [],
+        customer_name: r.customer_name
+      }))
+    });
+  } catch (error) {
+    console.error('Kapanan hesaplar hatası:', error);
+    res.status(500).json({ success: false, message: 'Kapanan hesaplar alınamadı.' });
+  }
+};

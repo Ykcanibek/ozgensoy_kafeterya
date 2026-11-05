@@ -27,7 +27,7 @@ export default function SalesSection({ data, compareLabel, fileLabel }) {
   const exportCsv = () => downloadCsv(`satis-kirilimi-${fileLabel}`, [
     { label: granularityLabel, value: r => r.label },
     { label: 'Adisyon', value: r => r.orders },
-    { label: 'Net satış (TL)', value: r => r.net },
+    { label: 'Net ciro (TL)', value: r => r.net },
     { label: 'Ortalama adisyon (TL)', value: r => Math.round(r.avg * 100) / 100 },
     ...(prevPoints ? [{ label: `${compareLabel} (TL)`, value: r => r.prev?.net ?? '' }] : [])
   ], rows);
@@ -36,16 +36,16 @@ export default function SalesSection({ data, compareLabel, fileLabel }) {
     <div className="rh-section">
       <SectionHead title="Satış Analizi" description="Satışların zamana dağılımı: hangi gün ve saatlerde yoğunsunuz?" />
 
-      <Card title="Yoğunluk haritası" subtitle="Haftanın günü × saat — net satış (kapanış saatine göre)">
+      <Card title="Yoğunluk haritası" subtitle="Haftanın günü × saat — net ciro (kapanış saatine göre)">
         {sales.order_count ? <Heatmap matrix={distribution.heatmap} hourFrom={from} hourTo={to} /> : <Empty />}
         {period.days < 7 && sales.order_count > 0 && <Note>Dönem bir haftadan kısa; harita daha uzun dönemlerde (ör. Bu Ay) daha anlamlı olur.</Note>}
       </Card>
 
       <div className="rh-grid-2">
-        <Card title="Saatlere göre" subtitle="Net satış">
+        <Card title="Saatlere göre" subtitle="Net ciro">
           <ColumnChart data={hours} />
         </Card>
-        <Card title="Haftanın günlerine göre" subtitle="Net satış">
+        <Card title="Haftanın günlerine göre" subtitle="Net ciro">
           <ColumnChart data={weekdays} />
         </Card>
       </div>
@@ -65,7 +65,7 @@ export default function SalesSection({ data, compareLabel, fileLabel }) {
                 <tr>
                   <th>{granularityLabel}</th>
                   <th className="num">Adisyon</th>
-                  <th className="num">Net satış</th>
+                  <th className="num">Net ciro</th>
                   <th className="num">Ort. adisyon</th>
                   {prevPoints && <th className="num">{compareLabel}</th>}
                   {prevPoints && <th className="num">Değişim</th>}
@@ -87,7 +87,7 @@ export default function SalesSection({ data, compareLabel, fileLabel }) {
                 <tr>
                   <td>Toplam</td>
                   <td className="num">{num(sales.order_count)}</td>
-                  <td className="num">{money(sales.net)}</td>
+                  <td className="num">{money(sales.revenue)}</td>
                   <td className="num">{money(sales.average_ticket)}</td>
                   {prevPoints && <td className="num">{money(prevPoints.reduce((s, p) => s + p.net, 0))}</td>}
                   {prevPoints && <td />}

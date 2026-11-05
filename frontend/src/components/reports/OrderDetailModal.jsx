@@ -151,9 +151,9 @@ export default function OrderDetailModal({ orderId, onClose, canPrint, onPrint }
                     {totals.complimentary > 0 && <div className="rp-break-row muted"><span>İkram</span><span>− {money(totals.complimentary)}</span></div>}
                     {totals.returned > 0 && <div className="rp-break-row muted"><span>İade</span><span>− {money(totals.returned)}</span></div>}
                     {totals.discount > 0 && <div className="rp-break-row muted"><span>İndirim</span><span>− {money(totals.discount)}</span></div>}
-                    <div className="rp-break-row strong"><span>Net</span><span>{money(totals.net)}</span></div>
-                    <div className="rp-break-row"><span>Tahsil edilen</span><span>{money(totals.collected)}</span></div>
-                    {totals.tip > 0 && <div className="rp-break-row muted"><span>Bahşiş</span><span>{money(totals.tip)}</span></div>}
+                    {totals.tip > 0 && <div className="rp-break-row muted"><span>Bahşiş</span><span>+ {money(totals.tip)}</span></div>}
+                    <div className="rp-break-row strong"><span>Net ciro</span><span>{money(totals.revenue)}</span></div>
+                    <div className="rp-break-row"><span>Tahsil edilen</span><span>{money(totals.collected + totals.tip)}</span></div>
                     {totals.voided > 0 && <div className="rp-break-row muted"><span>İptal edilen</span><span>{money(totals.voided)}</span></div>}
                     {totals.unpaid_closed > 0 && (
                       <div className="rp-break-row warn"><span><AlertTriangle size={14} /> Tahsil edilmeden kapatılan</span><span>{money(totals.unpaid_closed)}</span></div>

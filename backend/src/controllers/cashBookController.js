@@ -3,7 +3,7 @@ import ExcelJS from 'exceljs';
 import { pool } from '../config/db.js';
 import { getUserFromReq, logActivity } from '../config/auditLogger.js';
 import { can, deny } from '../middleware/auth.js';
-import { closeDay, closePendingDays, CASH_TIP_SQL, CARD_TIP_SQL } from '../services/dailyClosing.js';
+import { closeDay, closePendingDays } from '../services/dailyClosing.js';
 
 /*
  * KASA DEFTERİ
@@ -144,8 +144,8 @@ const loadPosDays = async (q, range) => {
   if (range.before) { where.push('p.created_at < ?'); params.push(`${range.before} 00:00:00`); }
   const [rows] = await pool.query(`
     SELECT DATE_FORMAT(p.created_at, '%Y-%m-%d') AS d,
-           COALESCE(SUM(p.cash_amount - (${CASH_TIP_SQL})), 0) AS cash,
-           COALESCE(SUM(p.card_amount - (${CARD_TIP_SQL})), 0) AS card,
+           COALESCE(SUM(p.cash_amount), 0) AS cash,
+           COALESCE(SUM(p.card_amount), 0) AS card,
            COALESCE(SUM(p.tip), 0) AS tip,
            SUM(p.cash_amount > 0) AS cash_count, SUM(p.card_amount > 0) AS card_count,
            SUM(p.order_id IS NULL) AS collections
@@ -180,9 +180,10 @@ const loadPosDays = async (q, range) => {
         document_no: null,
         counterparty: null,
         tax_number: null,
-        description: `${isToday ? 'Bugün (canlı) — ' : ''}${method === 'cash' ? 'Nakit' : 'Kartlı'} tahsilat, ${Number(r[`${method}_count`])} işlem` +
+        description: `${r.d.split('-').reverse().join('.')} günlük ciro (${isToday ? 'canlı, gün sonunda kaydedilecek' : 'henüz kaydedilmedi'}) — ` +
+          `${Number(r[`${method}_count`])} işlem` +
           (Number(r.collections) > 0 ? ' (cari tahsilatlar dahil)' : '') +
-          (Number(r.tip) > 0 ? '; bahşiş hariç' : '') +
+          (Number(r.tip) > 0 ? '; bahşiş dahil' : '') +
           (isToday ? '. Gün sonu cirosu gece 00:00’dan sonra kaydedilir.' : ''),
         created_by_name: 'Otomatik (POS)'
       });
@@ -235,12 +236,13 @@ const buildLedger = async (q) => {
 
   const includePos = posApplies(q);
   if (includePos) entries = entries.concat(await loadPosDays(q, { from, to }));
-  // Aynı gün içinde: önce günün cirosu (nakit, sonra kart), sonra elle girilen kayıtlar giriş sırasıyla
+  // Aynı gün içinde: önce elle girilen kayıtlar giriş sırasıyla, en sonda günün cirosu (gün kapanınca kaydedilir).
+  // Ekranda yeniden eskiye gösterildiği için ciro o günün en üstünde, nakit satırı kartın üstünde görünür.
   const isAuto = (e) => e.source !== 'manual';
   entries.sort((a, b) => a.entry_date.localeCompare(b.entry_date) ||
     (isAuto(a) === isAuto(b)
-      ? (isAuto(a) ? (a.payment_method === 'cash' ? -1 : 1) : a.id - b.id)
-      : (isAuto(a) ? -1 : 1)));
+      ? (isAuto(a) ? (a.payment_method === 'cash' ? 1 : -1) : a.id - b.id)
+      : (isAuto(a) ? 1 : -1)));
 
   // Devreden: dönem başından önceki hareketler (aynı filtrelerle), ödeme yöntemi bazında
   const openingByMethod = Object.fromEntries(Object.keys(PAYMENT_METHODS).map(m => [m, 0]));

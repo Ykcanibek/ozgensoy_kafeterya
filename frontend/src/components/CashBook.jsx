@@ -9,7 +9,7 @@ import { apiFetch, createSocket } from '../lib/api';
 import {
   Plus, Search, X, FileSpreadsheet, Tags, ArrowDownLeft, ArrowUpRight, Wallet, Scale,
   Landmark, CreditCard, Banknote, CircleDollarSign, Receipt, FileText, Pencil, Trash2,
-  Check, ChevronRight, ChevronDown, Info, Zap, Archive, FolderTree, Layers, CornerDownRight, RefreshCw, CalendarCheck,
+  Check, ChevronRight, ChevronDown, Info, Zap, Archive, FolderTree, Layers, CornerDownRight, RefreshCw,
   ArrowLeftRight, ArrowDown
 } from 'lucide-react';
 
@@ -592,6 +592,9 @@ function DailyReportModal({ date, canRecalc, onClose, onChanged, onOpenZReport }
   const hours = (d?.hourly || []).filter(h => h.orders > 0);
   const hourRange = hours.length ? (d.hourly || []).filter(h => h.hour >= hours[0].hour && h.hour <= hours.at(-1).hour) : [];
   const maxHour = Math.max(1, ...hourRange.map(h => h.net));
+  // Eski gün sonu kayıtlarında ciro alanı yok: ürün satışı + bahşişten hesaplanır
+  const closingTip = s?.tip ?? d?.tips?.total ?? 0;
+  const netCiro = s?.revenue ?? ((s?.net ?? 0) + closingTip);
   const catTotal = (d?.categories || []).reduce((t, x) => t + x.revenue, 0);
   const products = d?.products || [];
   const shownProducts = showAllProducts ? products : products.slice(0, 10);
@@ -618,7 +621,7 @@ function DailyReportModal({ date, canRecalc, onClose, onChanged, onOpenZReport }
           {closing && (
             <>
               <div className="cb-rep-kpis">
-                <div><span>Net satış</span><strong>{money(s.net)}</strong></div>
+                <div><span>Net ciro</span><strong>{money(netCiro)}</strong></div>
                 <div className="hl"><span>Deftere işlenen ciro</span><strong>{money(closing.cash_amount + closing.card_amount)}</strong></div>
                 <div><span>Adisyon</span><strong>{s.order_count}</strong></div>
                 <div><span>Ortalama adisyon</span><strong>{money(s.average_ticket)}</strong></div>
@@ -632,7 +635,7 @@ function DailyReportModal({ date, canRecalc, onClose, onChanged, onOpenZReport }
                     <dt><CreditCard size={14} /> Kart</dt><dd>{money(c.card)}</dd>
                     <dt className="total">Kasaya giren toplam</dt><dd className="total">{money(c.drawer_total)}</dd>
                     {c.account_collections > 0 && <><dt className="sub">↳ içindeki cari tahsilat</dt><dd className="sub">{money(c.account_collections)}</dd></>}
-                    <dt className="neg">− Bahşiş (personele ait)</dt><dd className="neg">{money(d.tips?.total ?? c.tip)}</dd>
+                    {(d.tips?.total ?? c.tip) > 0 && <><dt className="sub">↳ içindeki bahşiş</dt><dd className="sub">{money(d.tips?.total ?? c.tip)}</dd></>}
                     <dt className="total">Deftere işlenen ciro</dt><dd className="total">{money(closing.cash_amount + closing.card_amount)}</dd>
                     <dt className="muted">Veresiye (kasaya girmedi)</dt><dd className="muted">{money(c.veresiye)}</dd>
                   </dl>
@@ -648,7 +651,8 @@ function DailyReportModal({ date, canRecalc, onClose, onChanged, onOpenZReport }
                     <dt className="neg">− İndirim</dt><dd className="neg">{money(s.discount)}</dd>
                     <dt className="neg">− İkram</dt><dd className="neg">{money(s.complimentary)}</dd>
                     <dt className="neg">− İade</dt><dd className="neg">{money(s.returned)}</dd>
-                    <dt className="total">Net satış</dt><dd className="total">{money(s.net)}</dd>
+                    {closingTip > 0 && <><dt>+ Bahşiş</dt><dd>{money(closingTip)}</dd></>}
+                    <dt className="total">Net ciro</dt><dd className="total">{money(netCiro)}</dd>
                     <dt className="muted">İptal (satışa dahil değil)</dt><dd className="muted">{money(s.voided)}</dd>
                     {s.unpaid_closed > 0 && <><dt className="muted">Tahsil edilmeden kapatılan</dt><dd className="muted">{money(s.unpaid_closed)}</dd></>}
                   </dl>
@@ -958,7 +962,7 @@ export default function CashBook() {
   const linkedDay = /^\d{4}-\d{2}-\d{2}$/.test(searchParams.get('gun') || '') ? searchParams.get('gun') : null;
   const [period, setPeriod] = useState(linkedDay ? 'custom' : 'month');
   const [custom, setCustom] = useState(() => (linkedDay ? { startDate: linkedDay, endDate: linkedDay } : periodRange('month')));
-  const [filters, setFilters] = useState({ entry_type: '', category_id: '', payment_method: '', document_type: '', include_pos: true });
+  const [filters, setFilters] = useState({ entry_type: '', category_id: '', subcategory_id: '', payment_method: '', include_pos: true });
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [data, setData] = useState(null);
@@ -983,8 +987,10 @@ export default function CashBook() {
     if (range?.startDate) p.set('startDate', range.startDate);
     if (range?.endDate) p.set('endDate', range.endDate);
     Object.entries(filters).forEach(([k, v]) => {
-      if (k === 'include_pos') { if (!v) p.set('include_pos', '0'); } else if (v) p.set(k, v);
+      if (k === 'include_pos') { if (!v) p.set('include_pos', '0'); } else if (k !== 'subcategory_id' && v) p.set(k, v);
     });
+    // Alt kategori seçiliyse yalnızca o alt kategori, değilse ana kategorinin tamamı filtrelenir
+    if (filters.subcategory_id) p.set('category_id', filters.subcategory_id);
     if (debouncedSearch) p.set('search', debouncedSearch);
     return p.toString();
   }, [range?.startDate, range?.endDate, filters, debouncedSearch]);
@@ -1009,17 +1015,20 @@ export default function CashBook() {
   // Başka cihazda kayıt girilince / POS'ta tahsilat alınınca defteri yenile
   useEffect(() => {
     const socket = createSocket();
+    socket.on('resync', () => { load(); loadOptions(); });
     socket.on('cashbook:changed', () => { load(); loadOptions(); });
     socket.on('payment:completed', () => load());
     return () => socket.disconnect();
   }, [load, loadOptions]);
 
   const setFilter = (patch) => setFilters(f => ({ ...f, ...patch }));
-  const clearFilters = () => { setFilters(f => ({ ...f, entry_type: '', category_id: '', payment_method: '', document_type: '' })); setSearch(''); };
-  const activeFilterCount = ['entry_type', 'category_id', 'payment_method', 'document_type'].filter(k => filters[k]).length + (debouncedSearch ? 1 : 0);
+  const clearFilters = () => { setFilters(f => ({ ...f, entry_type: '', category_id: '', subcategory_id: '', payment_method: '' })); setSearch(''); };
+  const activeFilterCount = ['entry_type', 'category_id', 'payment_method'].filter(k => filters[k]).length + (debouncedSearch ? 1 : 0);
 
   const s = data?.summary;
   const entries = data?.entries || [];
+  // Bakiye sunucuda eskiden yeniye hesaplanır; tabloda en yeni hareket en üstte gösterilir (devreden bakiye en altta)
+  const rows = useMemo(() => [...entries].reverse(), [entries]);
   const byMethod = Object.fromEntries((s?.by_method || []).map(m => [m.method, m]));
 
   const modifyRights = (entry) => {
@@ -1032,6 +1041,7 @@ export default function CashBook() {
   const filterGroups = ['income', 'expense']
     .filter(t => !filters.entry_type || filters.entry_type === t)
     .map(t => ({ type: t, tree: buildTree(options?.categories, t) }));
+  const filterSubs = filterGroups.flatMap(g => g.tree).find(m => String(m.id) === String(filters.category_id))?.children || [];
 
   const exportExcel = async () => {
     try {
@@ -1129,29 +1139,26 @@ export default function CashBook() {
             <div className="cb-filters">
               <div className="cb-type-filter" role="group" aria-label="Tür">
                 {[['', 'Tümü'], ['income', 'Gelir'], ['expense', 'Gider'], ['transfer', 'Transfer']].map(([k, l]) => (
-                  <button key={k || 'all'} type="button" className={`${filters.entry_type === k ? 'active' : ''} ${k}`} onClick={() => setFilter({ entry_type: k, category_id: '' })}>{l}</button>
+                  <button key={k || 'all'} type="button" className={`${filters.entry_type === k ? 'active' : ''} ${k}`} onClick={() => setFilter({ entry_type: k, category_id: '', subcategory_id: '' })}>{l}</button>
                 ))}
               </div>
-              <select value={filters.category_id} onChange={(e) => setFilter({ category_id: e.target.value })} aria-label="Kategori">
+              <select value={filters.category_id} onChange={(e) => setFilter({ category_id: e.target.value, subcategory_id: '' })} aria-label="Kategori">
                 <option value="">Tüm kategoriler</option>
                 {filterGroups.map(g => (
                   <optgroup key={g.type} label={g.type === 'income' ? 'Gelir' : 'Gider'}>
-                    {g.tree.map(m => (
-                      <React.Fragment key={m.id}>
-                        <option value={m.id}>{m.name}{m.children.length ? ' (tümü)' : ''}</option>
-                        {m.children.map(c => <option key={c.id} value={c.id}>{'   ↳ '}{c.name}</option>)}
-                      </React.Fragment>
-                    ))}
+                    {g.tree.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </optgroup>
                 ))}
+              </select>
+              <select value={filters.subcategory_id} onChange={(e) => setFilter({ subcategory_id: e.target.value })}
+                disabled={!filterSubs.length} aria-label="Alt kategori"
+                title={!filters.category_id ? 'Önce kategori seçin' : (!filterSubs.length ? 'Bu kategorinin alt kategorisi yok' : undefined)}>
+                <option value="">{!filters.category_id ? 'Alt kategori' : (filterSubs.length ? 'Tüm alt kategoriler' : 'Alt kategorisi yok')}</option>
+                {filterSubs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
               <select value={filters.payment_method} onChange={(e) => setFilter({ payment_method: e.target.value })} aria-label="Ödeme yöntemi">
                 <option value="">Tüm ödeme yöntemleri</option>
                 {Object.entries(METHODS).map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
-              </select>
-              <select value={filters.document_type} onChange={(e) => setFilter({ document_type: e.target.value })} aria-label="Belge türü">
-                <option value="">Tüm belge türleri</option>
-                {(options?.document_types || []).map(d => <option key={d.key} value={d.key}>{d.label}</option>)}
               </select>
               <label className="cb-search">
                 <Search size={15} />
@@ -1191,12 +1198,6 @@ export default function CashBook() {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr className="cb-devir">
-                      <td className="cb-date">{range?.startDate ? trDate(range.startDate) : ''}</td>
-                      <td className="cb-cat" colSpan={5}>Devreden bakiye</td>
-                      <td className="num bal">{money(s?.opening)}</td>
-                      <td />
-                    </tr>
                     {entries.length === 0 && (
                       <tr className="cb-empty-tr"><td colSpan={8} className="cb-empty-row">
                         <Receipt size={26} />
@@ -1204,17 +1205,28 @@ export default function CashBook() {
                         {canCreate && !activeFilterCount && <span>Sağ üstteki <b>Yeni Kayıt</b> düğmesiyle ilk kaydı ekleyin.</span>}
                       </td></tr>
                     )}
-                    {entries.map((e, i) => {
+                    {rows.map((e, i) => {
                       const MethodIcon = METHODS[e.payment_method]?.Icon || CircleDollarSign;
                       const docLabel = options?.document_types?.find(d => d.key === e.document_type)?.label;
-                      const inBatch = e.batch_id && (entries[i - 1]?.batch_id === e.batch_id);
+                      const inBatch = e.batch_id && (rows[i - 1]?.batch_id === e.batch_id);
                       return (
                         <tr key={e.id} className={`cb-row-${e.entry_type} ${e.source !== 'manual' ? 'is-pos' : ''} ${inBatch ? 'in-batch' : ''}`}
                           onClick={() => setModal(e.source === 'pos_daily' ? { kind: 'closing', date: e.entry_date } : { kind: 'detail', entry: e })}>
                           <td className="cb-date">{trDate(e.entry_date)}</td>
+                          {e.source !== 'manual' ? (
+                          <td className="cb-cat cb-ciro">
+                            <strong>
+                              {trDate(e.entry_date)} Günlük Ciro
+                              <span className="cb-ciro-badge">{e.source === 'pos_live' ? 'Canlı · henüz kaydedilmedi' : 'Otomatik kayıt'}</span>
+                            </strong>
+                            <span>
+                              <b>{e.subcategory_name}</b>
+                              {e.description && <> · {e.description.split(' — ').slice(1).join(' — ') || e.description}</>}
+                            </span>
+                          </td>
+                          ) : (
                           <td className="cb-cat">
                             <strong>
-                              {e.source !== 'manual' && <Zap size={13} className="cb-pos-icon" />}
                               {e.entry_type === 'transfer' && <ArrowLeftRight size={13} className="cb-transfer-icon" />}
                               {e.category_name}
                               {e.subcategory_name && <><span className="cb-sep">›</span><span className="cb-subname">{e.subcategory_name}</span></>}
@@ -1222,8 +1234,9 @@ export default function CashBook() {
                             </strong>
                             {(e.description || e.counterparty) && <span>{[e.description, e.counterparty].filter(Boolean).join(' · ')}</span>}
                           </td>
+                          )}
                           <td className="cb-doc">
-                            {e.source === 'pos_daily' ? <span className="cb-auto"><CalendarCheck size={12} /> Gün sonu<em>Raporu aç</em></span> : e.source === 'pos_live' ? <span className="cb-auto">Canlı</span> : (e.document_type !== 'none' || e.document_no) ? (
+                            {e.source === 'pos_daily' ? <span className="cb-auto">Gün sonu<em>Raporu aç</em></span> : e.source === 'pos_live' ? <span className="cb-auto">Canlı</span> : (e.document_type !== 'none' || e.document_no) ? (
                               <>
                                 <span>{e.document_type !== 'none' ? docLabel : 'Evrak'}</span>
                                 {e.document_no && <em>{e.document_no}</em>}
@@ -1247,6 +1260,12 @@ export default function CashBook() {
                         </tr>
                       );
                     })}
+                    <tr className="cb-devir">
+                      <td className="cb-date">{range?.startDate ? trDate(range.startDate) : ''}</td>
+                      <td className="cb-cat" colSpan={5}>Devreden bakiye</td>
+                      <td className="num bal">{money(s?.opening)}</td>
+                      <td />
+                    </tr>
                   </tbody>
                   <tfoot>
                     <tr>

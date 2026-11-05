@@ -17,9 +17,11 @@ import StatusSplitModal from './tableOrder/StatusSplitModal';
 import TableTransferModal from './tableOrder/TableTransferModal';
 import MobileCartDrawer from './tableOrder/MobileCartDrawer';
 import QuickCustomerModal from './tableOrder/QuickCustomerModal';
+import ReversePaymentModal from './tableOrder/ReversePaymentModal';
+import CustomerReceiptPrintModal from './reports/CustomerReceiptPrintModal';
 import './customers.css';
 
-export default function TableOrderModal({ table, onClose, onTableUpdated, onTableSwitched }) {
+export default function TableOrderModal({ table, onClose, onTableUpdated, onTableSwitched, onPrintReceipt }) {
   const { user, can, canAny } = useAuth();
 
   // Bu pencerede kullanılan yetkiler (sunucu aynı kuralları ayrıca uygular)
@@ -37,6 +39,8 @@ export default function TableOrderModal({ table, onClose, onTableUpdated, onTabl
     veresiye: can('payment.veresiye'),
     discount: can('payment.discount'),
     tip: can('payment.tip'),
+    reverse: can('payment.void'),
+    print: can('payment.print'),
     customerCreate: can('customers.create'),
     maxDiscountPercent: user?.role === 'admin' ? null : (user?.max_discount_percent ?? null)
   }), [user, can, canAny]);
@@ -206,6 +210,8 @@ export default function TableOrderModal({ table, onClose, onTableUpdated, onTabl
 
   // Ödeme ve Tahsilat Değerleri
   const [paymentsList, setPaymentsList] = useState([]); // Masanın önceki tahsilat kayıtları
+  const [reversingPayment, setReversingPayment] = useState(null); // Geri alınmak üzere seçilen tahsilat
+  const [paymentReceipt, setPaymentReceipt] = useState(null); // Ara ödeme fişi önizlemesi
   const [paymentSplitMode, setPaymentSplitMode] = useState('amount'); // 'amount' (Tutar / Bölüşüm) | 'items' (Kalem Bazlı)
   const [customAmountToPay, setCustomAmountToPay] = useState(''); // Özel girilen veya oranla belirlenen tutar
   const [tipAmount, setTipAmount] = useState(0); // Bahşiş
@@ -430,9 +436,7 @@ export default function TableOrderModal({ table, onClose, onTableUpdated, onTabl
       setSavedItems(prev => prev.map(item => item.id === itemId ? { ...item, item_status: status } : item));
     });
 
-    socket.on('order:updated', (payload) => {
-      // Yalnızca bu masayı ilgilendiren güncellemelerde yeniden yükle (her masadaki değişiklikte değil)
-      if (payload?.tableId != null && Number(payload.tableId) !== Number(table.id)) return;
+    const refreshOrder = () => {
       apiFetch(`/api/orders/table/${table.id}`)
         .then(r => r.json())
         .then(data => {
@@ -450,6 +454,13 @@ export default function TableOrderModal({ table, onClose, onTableUpdated, onTabl
             });
           }
         });
+    };
+
+    socket.on('resync', refreshOrder);
+    socket.on('order:updated', (payload) => {
+      // Yalnızca bu masayı ilgilendiren güncellemelerde yeniden yükle (her masadaki değişiklikte değil)
+      if (payload?.tableId != null && Number(payload.tableId) !== Number(table.id)) return;
+      refreshOrder();
     });
 
     return () => {
@@ -681,6 +692,43 @@ export default function TableOrderModal({ table, onClose, onTableUpdated, onTabl
   };
 
   // Kalem durumunu güncelleme (delivered, complimentary, returned, cancelled, pending)
+  // Ara ödeme fişi: yalnızca o tahsilatla ödenen ürünler (müşteri isterse)
+  const handlePrintPayment = async (payment) => {
+    const data = await apiFetch(`/api/orders/payments/${payment.id}/receipt`).then(r => r.json()).catch(() => null);
+    if (data?.success) setPaymentReceipt(data);
+    else showToast(data?.message || 'Fiş hazırlanamadı.', 'danger');
+  };
+
+  // Yanlış alınan tahsilatı geri al: o tahsilatla ödenen ürünler tekrar ödenmemiş olur (adisyon yeniden yüklenir)
+  const handleReversePayment = async (payment, reason) => {
+    try {
+      const res = await apiFetch(`/api/orders/payments/${payment.id}/reverse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        showToast(data.message || 'Tahsilat geri alınamadı.', 'danger');
+        return false;
+      }
+      const fresh = await apiFetch(`/api/orders/table/${table.id}`).then(r => r.json()).catch(() => null);
+      if (fresh?.success) {
+        setExistingOrder(fresh.order);
+        setSavedItems(fresh.items || []);
+        setPaymentsList(fresh.payments || []);
+      }
+      setSelectedItemIds([]);
+      setReversingPayment(null);
+      showToast(data.message, 'success');
+      onTableUpdated?.();
+      return true;
+    } catch {
+      showToast('Sunucuya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.', 'danger');
+      return false;
+    }
+  };
+
   const handleUpdateItemStatus = async (item, targetStatus, quantity = null) => {
     setActionDropdownItemId(null);
     const itemQty = parseInt(item.quantity, 10) || 1;
@@ -1033,6 +1081,11 @@ export default function TableOrderModal({ table, onClose, onTableUpdated, onTabl
           }
         } else {
           showToast('Hesap başarıyla kapatıldı ve masa boşaltıldı!', 'success');
+          // Hesap kapanınca masanın tüm fişi yazdırma için otomatik açılır (ara ödemelerde açılmaz)
+          if (perms.print && data.orderId && onPrintReceipt) {
+            const receipt = await apiFetch(`/api/orders/${data.orderId}/receipt`).then(r => r.json()).catch(() => null);
+            if (receipt?.success) onPrintReceipt(receipt);
+          }
           setTimeout(() => {
             onClose();
           }, 500);
@@ -1117,6 +1170,8 @@ export default function TableOrderModal({ table, onClose, onTableUpdated, onTabl
             handleToggleItemSelection={handleToggleItemSelection}
             handleUpdateItemStatus={handleUpdateItemStatus}
             handleUpdatePayQty={handleUpdatePayQty}
+            onReversePayment={setReversingPayment}
+            onPrintPayment={handlePrintPayment}
             paidTotal={paidTotal}
             payingQuantities={payingQuantities}
             paymentsList={paymentsList}
@@ -1246,6 +1301,14 @@ export default function TableOrderModal({ table, onClose, onTableUpdated, onTabl
       )}
 
       <StatusSplitModal handleUpdateItemStatus={handleUpdateItemStatus} setStatusPrompt={setStatusPrompt} statusPrompt={statusPrompt} />
+      <CustomerReceiptPrintModal printingReceipt={paymentReceipt} setPrintingReceipt={setPaymentReceipt} />
+      {reversingPayment && (
+        <ReversePaymentModal
+          payment={reversingPayment}
+          onCancel={() => setReversingPayment(null)}
+          onConfirm={handleReversePayment}
+        />
+      )}
 
       <MobileCartDrawer
         perms={perms}

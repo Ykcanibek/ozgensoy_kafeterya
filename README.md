@@ -53,6 +53,5 @@ npm --prefix backend test
 ```bash
 npm --prefix backend run backup
 ```
-Yedek `backend/backups/` klasörüne tarihli `.sql` dosyası olarak yazılır; en yeni 30 yedek tutulur (`BACKUP_KEEP` ile değiştirilebilir).
-`mysqldump` bulunamazsa `backend/.env` içine `MYSQLDUMP_PATH` ekleyin. Her gün otomatik yedek için bu komutu Windows Görev Zamanlayıcı'ya ekleyin.
-Geri yükleme: `mysql -u root -p kafe_otomasyon < backend/backups/<dosya>.sql`
+Sunucu çalışırken günde bir yedek kendiliğinden alınır; bu komut elle yedek alır. Yedek `backend/backups/` klasörüne tarihli `.sql.gz` dosyası olarak yazılır; en yeni 30 yedek tutulur (`BACKUP_KEEP` ile değiştirilebilir). Panelde **Yedekler** ekranından indirilir.
+Geri yükleme: `gunzip -c backend/backups/<dosya>.sql.gz | mysql -u root -p kafe_otomasyon` ya da phpMyAdmin → İçe Aktar

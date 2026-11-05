@@ -226,7 +226,7 @@ test('gün sonu: geçmiş günün cirosu ayrıntılı raporuyla kasa defterine i
   const book = await call('GET', `/cashbook?startDate=${yesterday}&endDate=${yesterday}`);
   const daily = book.entries.filter(e => e.source === 'pos_daily');
   assert.equal(daily.length, 2, 'nakit ve kart için iki satır');
-  assert.equal(daily.find(e => e.payment_method === 'cash').amount, price * 2, 'bahşiş (₺10) ciroya işlenmez');
+  assert.equal(daily.find(e => e.payment_method === 'cash').amount, price * 2 + 10, 'bahşiş (₺10) işletmeye kalır, ciroya işlenir');
   assert.equal(daily.find(e => e.payment_method === 'card').amount, price);
   assert.ok(!book.entries.some(e => e.source === 'pos_live'), 'kapanan gün canlı olarak tekrar sayılmaz');
   assert.equal(daily[0].category_name, 'Günlük Ciro (POS)');
@@ -237,9 +237,27 @@ test('gün sonu: geçmiş günün cirosu ayrıntılı raporuyla kasa defterine i
   assert.equal(report.closing.details.sales.net, price * 3);
   assert.equal(report.closing.details.collections.tip, 10);
   assert.deepEqual(report.closing.details.tips, { cash: 10, card: 0, total: 10 });
-  assert.equal(report.closing.cash_amount + report.closing.card_amount, report.closing.details.sales.net, 'deftere işlenen ciro = net satış');
+  assert.equal(report.closing.cash_amount + report.closing.card_amount, report.closing.details.sales.net + 10, 'deftere işlenen ciro = net satış + bahşiş');
+  assert.equal(report.closing.cash_amount + report.closing.card_amount, report.closing.details.collections.drawer_total, 'deftere işlenen = kasaya giren');
   assert.ok(report.closing.details.products.some(p => p.product_name === product.name && p.qty === 3));
   assert.equal(report.closing.trigger_type, 'manual');
+
+  // Tüm raporlarda aynı rakam: net ciro = ürün satışı + bahşiş
+  const ciro = price * 3 + 10;
+  assert.equal(report.closing.details.sales.revenue, ciro);
+  const summary = await call('GET', `/reports/sales-summary?startDate=${yesterday}&endDate=${yesterday}`);
+  assert.equal(summary.sales.revenue, ciro);
+  assert.equal(summary.sales.net, price * 3, 'ürün satışı ayrıca korunur');
+  assert.equal(summary.sales.tip, 10);
+  assert.equal(summary.sales.average_ticket, ciro);
+  assert.equal(summary.trend.points.reduce((sum, p) => sum + p.net, 0), ciro, 'satış eğrisi');
+  assert.equal(summary.distribution.hours.reduce((sum, h) => sum + h.net, 0), ciro, 'saat dağılımı');
+  const closedOrders = await call('GET', `/reports/orders?startDate=${yesterday}&endDate=${yesterday}`);
+  assert.equal(closedOrders.orders.reduce((sum, o) => sum + o.net, 0), ciro, 'adisyon listesi');
+  const detail = await call('GET', `/reports/orders/${closedOrders.orders[0].id}`);
+  assert.equal(detail.totals.revenue, ciro, 'adisyon detayı');
+  const tableReport = await call('GET', `/reports/tables?startDate=${yesterday}&endDate=${yesterday}`);
+  assert.equal(tableReport.totals.net, ciro, 'masa raporu');
 
   // Tekrar çalıştırma ve yeniden hesaplama satırları çoğaltmaz
   const again = await call('POST', '/cashbook/closings/run');
@@ -306,4 +324,17 @@ test('hesaplar arası transfer gelir/gider sayılmaz, yalnızca hesap bakiyeleri
   const edit = await call('PUT', `/cashbook/${res.entry.id}`, { ...res.entry, amount: 650 });
   assert.equal(edit.status, 200, edit.message);
   assert.equal(edit.entry.amount, 650);
+});
+
+test('bahşişi personele dağıtmak için Personel Giderleri › Bahşiş Ödemesi kategorisi hazır gelir', async () => {
+  const { categories } = await call('GET', '/cashbook/options');
+  const parent = categories.find(c => c.entry_type === 'expense' && !c.parent_id && c.name === 'Personel Giderleri');
+  assert.ok(parent, 'Personel Giderleri ana kategorisi olmalı');
+  const sub = categories.find(c => c.parent_id === parent.id && c.name === 'Bahşiş Ödemesi');
+  assert.ok(sub, 'Bahşiş Ödemesi alt kategorisi olmalı');
+  const res = await call('POST', '/cashbook', {
+    entry_type: 'expense', entry_date: today, category_id: parent.id, subcategory_id: sub.id,
+    amount: 10, payment_method: 'cash', description: 'Günün bahşişi personele dağıtıldı'
+  });
+  assert.ok(res.success, res.message);
 });

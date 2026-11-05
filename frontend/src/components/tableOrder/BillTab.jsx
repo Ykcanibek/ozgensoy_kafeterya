@@ -10,7 +10,9 @@ import {
   Gift,
   RotateCcw,
   Ban,
-  MoreHorizontal
+  MoreHorizontal,
+  Undo2,
+  Printer
 } from 'lucide-react';
 
 // Orta panel / Hesap sekmesi: kısmi tahsilat geçmişi ve adisyon kalemleri tablosu
@@ -26,6 +28,8 @@ export default function BillTab({
   handleToggleItemSelection,
   handleUpdateItemStatus,
   handleUpdatePayQty,
+  onReversePayment,
+  onPrintPayment,
   paidTotal,
   payingQuantities,
   paymentsList,
@@ -74,6 +78,18 @@ export default function BillTab({
                     <strong>₺{parseFloat(pm.total_amount || 0).toFixed(2)}</strong>
                     <span className="pill-method">({methodLabel})</span>
                     {timeStr && <span className="pill-time">{timeStr}</span>}
+                    {perms.print && (
+                      <button type="button" className="pill-action pill-print" title="Bu ödemenin fişini yazdır" aria-label="Ödeme fişini yazdır"
+                        onClick={() => onPrintPayment(pm)}>
+                        <Printer size={13} />
+                      </button>
+                    )}
+                    {perms.reverse && Number(pm.reversible) === 1 && (
+                      <button type="button" className="pill-action pill-reverse" title="Bu tahsilatı geri al" aria-label="Tahsilatı geri al"
+                        onClick={() => onReversePayment(pm)}>
+                        <Undo2 size={13} />
+                      </button>
+                    )}
                   </div>
                 );
               })}

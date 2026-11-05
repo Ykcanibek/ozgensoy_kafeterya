@@ -3,6 +3,8 @@
  * gerçek API üzerinden çalışır ve bitince veritabanını siler. Gerçek veriye dokunmaz.
  */
 import { spawn } from 'child_process';
+import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
@@ -26,9 +28,10 @@ export const waitForHealth = async (port) => {
 export async function startTestServer() {
   const dbName = `${process.env.DB_NAME || 'kafe_otomasyon'}_test_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
   const port = 5600 + Math.floor(Math.random() * 300);
+  const backupDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kafe-yedek-'));
   const server = spawn(process.execPath, [SERVER_PATH], {
     // Sunucu bilerek başka saat diliminde başlatılır: uygulama kendi saat dilimini (İstanbul) sabitlemeli
-    env: { ...process.env, DB_NAME: dbName, PORT: String(port), TZ: 'America/New_York', MENU_HOST: 'menu.test' },
+    env: { ...process.env, DB_NAME: dbName, PORT: String(port), TZ: 'America/New_York', MENU_HOST: 'menu.test', BACKUP_DIR: backupDir },
     stdio: 'ignore'
   });
   if (!(await waitForHealth(port))) {
@@ -64,11 +67,14 @@ export async function startTestServer() {
     dbName,
     port,
     db,
+    backupDir,
     call,
     get token() { return token; },
+    useToken(next) { token = next; },
     async stop() {
       server.kill();
       await db.query(`DROP DATABASE IF EXISTS \`${dbName}\``);
+      fs.rmSync(backupDir, { recursive: true, force: true });
       await db.end();
     }
   };

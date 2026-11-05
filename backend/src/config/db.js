@@ -37,7 +37,8 @@ export async function createDatabaseIfNotExists() {
     }
     const [[exists]] = await connection.query('SELECT COUNT(*) AS n FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?', [dbName]);
     await connection.end();
-    if (!exists.n) throw new Error(`'${dbName}' veritabanı yok ve bu kullanıcı oluşturamıyor. Barındırma panelinden oluşturup DB_NAME'e yazın.`);
+    // Yetkisi olmadığı veritabanını MySQL kullanıcıdan gizler: "yok" ile "kullanıcı bağlı değil" burada ayırt edilemez
+    if (!exists.n) throw new Error(`'${dbName}' veritabanı bulunamadı ya da '${dbConfig.user}' kullanıcısının bu veritabanında yetkisi yok. Barındırma panelinden veritabanını açın, kullanıcıyı veritabanına ekleyip tüm yetkileri (ALL PRIVILEGES) verin ve adını DB_NAME'e yazın.`);
     console.log(`[MySQL] Veritabanı '${dbName}' hazır.`);
   } catch (error) {
     console.error('[MySQL] Veritabanı oluşturma/bağlantı hatası:', error.message);

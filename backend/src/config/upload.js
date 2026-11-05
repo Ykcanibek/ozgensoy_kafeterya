@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Uploads ana dizini
-const uploadsDir = path.resolve(__dirname, '../../uploads');
+export const uploadsDir = path.resolve(__dirname, '../../uploads');
 
 // Görsel işleme kütüphanesi (sharp) ilk kullanımda yüklenir: sunucuda yüklenemezse (ör. eski Linux) yalnızca görsel
 // yükleme hata verir, sistemin geri kalanı çalışmaya devam eder.

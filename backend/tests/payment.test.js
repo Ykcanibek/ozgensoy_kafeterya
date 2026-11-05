@@ -114,6 +114,7 @@ test('kullanıcı kendi şifresini değiştirebilir', async () => {
   assert.equal(wrong.status, 400);
   const ok = await call('PUT', '/auth/password', { current_password: current, new_password: 'yeni-sifre-123' });
   assert.ok(ok.success, ok.message);
+  ctx.useToken(ok.token); // Eski oturum artık geçersiz; yanıttaki yeni oturumla devam edilir
   const relogin = await call('POST', '/auth/login', { username: process.env.DEV_ACCOUNT_USERNAME, password: 'yeni-sifre-123' }, null);
   assert.ok(relogin.success);
 });
@@ -177,4 +178,169 @@ test('mutfak: uzun hazırlanan ürün teslim edildikten sonra 1 saat "son teslim
   const kitchen = await call('GET', '/orders/kitchen');
   const shown = kitchen.orders.flatMap(o => o.items).some(i => i.id === item.id && i.item_status === 'delivered');
   assert.ok(shown, 'teslim edilen ürün listede görünmeli');
+});
+
+// Geri alma testleri kendi masalarını açar (diğer testlerin masalarıyla karışmasın)
+const newTable = async (title) => {
+  const res = await call('POST', '/tables', { title, table_number: title.replace(/\s+/g, '-') });
+  return res.table || res;
+};
+
+test('tahsilat geri alma: yanlış seçilen ürünler tekrar ödenmemiş olur, kalan borç ve kayıtlar düzelir', async () => {
+  const t = await newTable('Geri Alma 1');
+  const [item] = await openTable(t.id, 5);
+  // Erken kalkan müşteri 2 adet öder (yanlışlıkla seçilmiş olsun)
+  const pay = await call('POST', `/orders/table/${t.id}/pay`, { payment_method: 'cash', paid_items: [{ id: item.id, quantity: 2 }] });
+  assert.ok(pay.success && pay.isPartial, pay.message);
+  let order = await call('GET', `/orders/table/${t.id}`);
+  assert.equal(order.payments.length, 1);
+  const payment = order.payments[0];
+  assert.equal(Number(payment.reversible), 1);
+  assert.deepEqual(payment.items.map(i => i.quantity), [2], 'tahsilatın hangi ürünü ödediği bilinir');
+
+  // Neden yazılmadan geri alınamaz
+  const noReason = await call('POST', `/orders/payments/${payment.id}/reverse`, { reason: ' ' });
+  assert.equal(noReason.success, false);
+
+  const rev = await call('POST', `/orders/payments/${payment.id}/reverse`, { reason: 'Yanlış ürünler seçildi' });
+  assert.ok(rev.success, rev.message);
+  assert.equal(rev.reopened_items, 1);
+  assert.equal(rev.remaining, product.price * 5);
+
+  order = await call('GET', `/orders/table/${t.id}`);
+  assert.equal(order.payments.length, 0, 'tahsilat masadan kalkar');
+  assert.ok(order.items.every(i => !i.is_paid), 'tüm ürünler tekrar ödenmemiş');
+  assert.equal(order.items.reduce((s, i) => s + i.quantity, 0), 5);
+  assert.equal(order.items.length, 1, 'ödemede bölünen satır eski hâline (tek satır) döner');
+  assert.equal(Number(order.order.total_price), product.price * 5);
+
+  const [[left]] = await db.query('SELECT COUNT(*) AS n FROM payments WHERE id = ?', [payment.id]);
+  assert.equal(left.n, 0, 'raporlar ve gün sonu tahsilatı görmez');
+  const [[arch]] = await db.query('SELECT reason, total_amount, items_json FROM payment_reversals WHERE payment_id = ?', [payment.id]);
+  assert.equal(arch.reason, 'Yanlış ürünler seçildi');
+  assert.equal(Number(arch.total_amount), product.price * 2);
+  assert.equal(JSON.parse(arch.items_json)[0].qty, 2);
+  const [[log]] = await db.query("SELECT title FROM audit_logs WHERE action_type = 'payment_reversed' AND entity_id = ?", [payment.id]);
+  assert.match(log.title, /Tahsilat Geri Alındı/);
+
+  // Aynı tahsilat ikinci kez geri alınamaz; doğru ürünlerle tekrar ödenip hesap kapanabilir
+  assert.equal((await call('POST', `/orders/payments/${payment.id}/reverse`, { reason: 'tekrar' })).success, false);
+  const close = await call('POST', `/orders/table/${t.id}/pay`, { payment_method: 'credit_card' });
+  assert.ok(close.success && !close.isPartial, close.message);
+});
+
+test('tahsilat geri alma: birleşik ödenmiş satırdan yalnızca o tahsilatın adedi açılır; kapanan hesap, geçmiş gün ve eski kayıt geri alınamaz', async () => {
+  const t = await newTable('Geri Alma 2');
+  const [item] = await openTable(t.id, 4);
+  await call('POST', `/orders/table/${t.id}/pay`, { payment_method: 'cash', paid_items: [{ id: item.id, quantity: 1 }] });
+  let order = await call('GET', `/orders/table/${t.id}`);
+  const unpaid = order.items.find(i => !i.is_paid);
+  await call('POST', `/orders/table/${t.id}/pay`, { payment_method: 'credit_card', paid_items: [{ id: unpaid.id, quantity: 2 }] });
+  order = await call('GET', `/orders/table/${t.id}`);
+  const paidRows = order.items.filter(i => i.is_paid);
+  assert.equal(paidRows.length, 1, 'aynı ürünün ödenen kısımları tek satırda birleşik kalır');
+  assert.equal(paidRows[0].quantity, 3);
+  const [first, second] = order.payments;
+
+  const rev = await call('POST', `/orders/payments/${second.id}/reverse`, { reason: 'Yanlış tutar girildi' });
+  assert.ok(rev.success, rev.message);
+  order = await call('GET', `/orders/table/${t.id}`);
+  const paid = order.items.filter(i => i.is_paid);
+  assert.equal(paid.length, 1);
+  assert.equal(paid[0].quantity, 1, 'ilk tahsilatın ürünü ödenmiş kalır');
+  assert.equal(order.items.filter(i => !i.is_paid).reduce((s, i) => s + i.quantity, 0), 3);
+  assert.equal(Number(order.order.total_price), product.price * 3);
+
+  // Geçmiş günün tahsilatı geri alınamaz
+  await db.query('UPDATE payments SET created_at = created_at - INTERVAL 1 DAY WHERE id = ?', [first.id]);
+  const past = await call('POST', `/orders/payments/${first.id}/reverse`, { reason: 'Yanlış ürünler seçildi' });
+  assert.equal(past.success, false);
+  assert.match(past.message, /bugün/);
+  await db.query('UPDATE payments SET created_at = created_at + INTERVAL 1 DAY WHERE id = ?', [first.id]);
+
+  // Özellikten önce alınmış (ürünleri kayıtlı olmayan) tahsilat geri alınamaz
+  await db.query('UPDATE payments SET items_tracked = NULL WHERE id = ?', [first.id]);
+  const legacy = await call('POST', `/orders/payments/${first.id}/reverse`, { reason: 'Yanlış ürünler seçildi' });
+  assert.equal(legacy.success, false);
+  await db.query('UPDATE payments SET items_tracked = 1 WHERE id = ?', [first.id]);
+
+  // Hesap kapandıktan sonra geri alınamaz
+  const close = await call('POST', `/orders/table/${t.id}/pay`, { payment_method: 'cash' });
+  assert.ok(close.success && !close.isPartial, close.message);
+  const closed = await call('POST', `/orders/payments/${first.id}/reverse`, { reason: 'Yanlış ürünler seçildi' });
+  assert.equal(closed.success, false);
+  assert.match(closed.message, /kapanmış/);
+});
+
+test('tahsilat geri alma: veresiye kısmı müşterinin borcundan düşülür', async () => {
+  const t = await newTable('Geri Alma 3');
+  const [item] = await openTable(t.id, 3);
+  const pay = await call('POST', `/orders/table/${t.id}/pay`, {
+    payment_method: 'veresiye', customer_name: 'Geri Alma Testi', paid_items: [{ id: item.id, quantity: 1 }]
+  });
+  assert.ok(pay.success, pay.message);
+  const [[cust]] = await db.query("SELECT id, current_balance FROM customers WHERE name = 'Geri Alma Testi'");
+  assert.equal(Number(cust.current_balance), product.price);
+  const order = await call('GET', `/orders/table/${t.id}`);
+  const rev = await call('POST', `/orders/payments/${order.payments[0].id}/reverse`, { reason: 'Yanlış müşteriye yazıldı' });
+  assert.ok(rev.success, rev.message);
+  const [[after]] = await db.query('SELECT current_balance, total_debt FROM customers WHERE id = ?', [cust.id]);
+  assert.equal(Number(after.current_balance), 0);
+  assert.equal(Number(after.total_debt), 0);
+  const [[tx]] = await db.query("SELECT COUNT(*) AS n FROM customer_transactions WHERE customer_id = ? AND transaction_type = 'debt'", [cust.id]);
+  assert.equal(tx.n, 0, 'borç hareketi kalkar');
+});
+
+test('fiş: ara ödeme fişi yalnızca o ödemenin ürünlerini, hesap fişi tüm masayı ve tüm ödemeleri gösterir', async () => {
+  const t = await newTable('Fis Testi');
+  const [item] = await openTable(t.id, 3);
+  const partial = await call('POST', `/orders/table/${t.id}/pay`, { payment_method: 'cash', paid_items: [{ id: item.id, quantity: 1 }] });
+  assert.ok(partial.success && partial.isPartial, partial.message);
+  assert.ok(partial.paymentId && partial.orderId, 'yanıt fiş için ödeme ve adisyon numarasını taşır');
+
+  const part = await call('GET', `/orders/payments/${partial.paymentId}/receipt`);
+  assert.ok(part.success, part.message);
+  assert.equal(part.receipt.title, 'ARA ÖDEME FİŞİ');
+  assert.deepEqual(part.items.map(i => [i.quantity, i.total_price]), [[1, product.price]]);
+  assert.equal(part.receipt.total_amount, product.price);
+
+  const close = await call('POST', `/orders/table/${t.id}/pay`, { payment_method: 'credit_card', tip: 5, amount_paid: product.price * 2 + 5 });
+  assert.ok(close.success && !close.isPartial, close.message);
+  const full = await call('GET', `/orders/${close.orderId}/receipt`);
+  assert.ok(full.success, full.message);
+  assert.deepEqual(full.items.map(i => i.quantity), [3], 'aynı ürün fişte tek satır');
+  assert.equal(full.receipt.payment_count, 2);
+  assert.equal(full.receipt.title, null, 'hesap fişinde ek başlık yok');
+  assert.equal(full.receipt.payment_method, 'mixed');
+  assert.equal(full.receipt.cash_amount, product.price);
+  assert.equal(full.receipt.card_amount, product.price * 2 + 5);
+  assert.equal(full.receipt.tip, 5);
+  assert.equal(full.receipt.total_amount, product.price * 3 + 5);
+});
+
+test('otomatik fiş ayarı açılıp kapatılabilir (varsayılan açık)', async () => {
+  assert.equal((await call('GET', '/orders/receipt-settings')).auto_receipt, true);
+  const off = await call('PUT', '/orders/receipt-settings', { auto_receipt: false });
+  assert.ok(off.success, off.message);
+  assert.equal((await call('GET', '/orders/receipt-settings')).auto_receipt, false);
+  assert.equal((await call('PUT', '/orders/receipt-settings', { auto_receipt: 'evet' })).success, false, 'geçersiz değer reddedilir');
+  assert.equal((await call('PUT', '/orders/receipt-settings', { auto_receipt: true })).auto_receipt, true);
+});
+
+test('kapanan hesaplar listesi: bugün kapanan masa en üstte, fişi yeniden alınabilir', async () => {
+  const t = await newTable('Unutulan Fis');
+  await openTable(t.id, 2);
+  const close = await call('POST', `/orders/table/${t.id}/pay`, { payment_method: 'cash' });
+  assert.ok(close.success && !close.isPartial, close.message);
+  const list = await call('GET', '/orders/closed-receipts');
+  assert.ok(list.success, list.message);
+  assert.equal(list.receipts[0].order_id, close.orderId, 'en son kapanan en üstte');
+  assert.equal(list.receipts[0].table_title, 'Unutulan Fis');
+  assert.equal(list.receipts[0].total_amount, product.price * 2);
+  assert.deepEqual(list.receipts[0].methods, ['cash']);
+  const receipt = await call('GET', `/orders/${list.receipts[0].order_id}/receipt`);
+  assert.equal(receipt.items[0].quantity, 2);
+  // Başka bir günün listesi ayrı gelir
+  const old = await call('GET', '/orders/closed-receipts?date=2000-01-01');
+  assert.equal(old.receipts.length, 0);
 });

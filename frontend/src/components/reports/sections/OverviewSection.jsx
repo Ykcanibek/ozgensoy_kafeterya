@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Receipt, ShoppingBasket, Clock, Wallet, Gift, Percent, Layers, TrendingUp,
-  Sparkles, AlertTriangle, Flame, Trophy, CalendarDays, ArrowRight
+  Sparkles, AlertTriangle, Flame, Trophy, CalendarDays, ArrowRight, HandCoins
 } from 'lucide-react';
 import { money, num, pct, formatDuration, changeInfo } from '../reportUtils';
 import { Card, Kpi, Delta, Empty, SectionHead } from '../ui';
@@ -13,10 +13,10 @@ function buildInsights(d, compareLabel) {
   const { sales, collections, comparison, distribution, top_products: top, categories } = d;
   if (!sales.order_count) return out;
 
-  if (comparison?.net) {
-    const c = changeInfo(sales.net, comparison.net.previous);
+  if (comparison?.revenue) {
+    const c = changeInfo(sales.revenue, comparison.revenue.previous);
     if (c?.value !== undefined && c.value !== 0) {
-      out.push({ tone: c.value > 0 ? 'good' : 'bad', Icon: TrendingUp, text: <>Net satış {compareLabel?.toLocaleLowerCase('tr-TR')} göre <strong>{c.label}</strong> ({money(comparison.net.previous)} → {money(sales.net)}).</> });
+      out.push({ tone: c.value > 0 ? 'good' : 'bad', Icon: TrendingUp, text: <>Net ciro {compareLabel?.toLocaleLowerCase('tr-TR')} göre <strong>{c.label}</strong> ({money(comparison.revenue.previous)} → {money(sales.revenue)}).</> });
     }
   }
   const peakHour = distribution.hours.reduce((b, h) => (h.net > b.net ? h : b), distribution.hours[0]);
@@ -31,7 +31,7 @@ function buildInsights(d, compareLabel) {
     out.push({ tone: 'info', Icon: Trophy, text: <>En çok kazandıran ürün <strong>{top[0].product_name}</strong>: {num(top[0].qty)} adet, {money(top[0].revenue)}.</> });
   }
   if (categories?.[0] && categories.length > 1) {
-    out.push({ tone: 'info', Icon: Layers, text: <>Cironun <strong>{pct(categories[0].share, 0)}</strong>'i {categories[0].category_name} kategorisinden.</> });
+    out.push({ tone: 'info', Icon: Layers, text: <>Satışların <strong>{pct(categories[0].share, 0)}</strong>'i {categories[0].category_name} kategorisinden.</> });
   }
   if (sales.unpaid_closed > 0) {
     out.push({ tone: 'warn', Icon: AlertTriangle, text: <><strong>{money(sales.unpaid_closed)}</strong> tutarında adisyon ödemesi alınmadan kapatılmış. Adisyonlar bölümünden kontrol edin.</> });
@@ -58,11 +58,11 @@ export default function OverviewSection({ data, compareLabel, onNavigate, canSee
 
       <div className="rh-hero-row">
         <div className="rh-hero">
-          <div className="rh-hero-label">Net satış</div>
-          <div className="rh-hero-value">{money(sales.net)}</div>
+          <div className="rh-hero-label">Net ciro</div>
+          <div className="rh-hero-value">{money(sales.revenue)}</div>
           <div className="rh-hero-meta">
-            {cmp && <Delta current={sales.net} previous={cmp.net.previous} />}
-            {cmp && <span>{compareLabel}: {money(cmp.net.previous)}</span>}
+            {cmp?.revenue && <Delta current={sales.revenue} previous={cmp.revenue.previous} />}
+            {cmp?.revenue && <span>{compareLabel}: {money(cmp.revenue.previous)}</span>}
           </div>
           <Sparkline values={trend.points.map(p => p.net)} width={220} height={46} />
           <dl className="rh-hero-bridge">
@@ -70,7 +70,8 @@ export default function OverviewSection({ data, compareLabel, onNavigate, canSee
             <div><dt>İkram</dt><dd>− {money(sales.complimentary)}</dd></div>
             <div><dt>İade</dt><dd>− {money(sales.returned)}</dd></div>
             <div><dt>İndirim</dt><dd>− {money(sales.discount)}</dd></div>
-            <div className="total"><dt>Net satış</dt><dd>{money(sales.net)}</dd></div>
+            <div><dt>Bahşiş</dt><dd>+ {money(sales.tip)}</dd></div>
+            <div className="total"><dt>Net ciro</dt><dd>{money(sales.revenue)}</dd></div>
           </dl>
         </div>
 
@@ -82,12 +83,12 @@ export default function OverviewSection({ data, compareLabel, onNavigate, canSee
           <Kpi Icon={Wallet} label="Kasaya giren" value={money(collections.drawer_total)} sub="Nakit + kart" current={collections.drawer_total} previous={prev('drawer_total')} />
           <Kpi Icon={Gift} label="İkram · iade · iptal" value={money(sales.loss_amount)} sub={`Brütün ${pct(sales.loss_rate)}`} current={sales.loss_amount} previous={prev('loss_amount')} inverse tone={sales.loss_rate >= 5 ? 'warn' : undefined} />
           <Kpi Icon={Percent} label="İndirim" value={money(sales.discount)} sub={`Brütün ${pct(sales.discount_rate)}`} current={sales.discount} previous={prev('discount')} inverse />
-          <Kpi Icon={AlertTriangle} label="Tahsilsiz kapatılan" value={money(sales.unpaid_closed)} tone={sales.unpaid_closed > 0 ? 'warn' : undefined} hint="Ödemesi alınmadan kapatılan adisyonların tutarı" />
+          <Kpi Icon={HandCoins} label="Bahşiş" value={money(sales.tip)} sub="Net ciroya dahil" current={sales.tip} previous={prev('tip')} hint="Bahşiş işletmeye kalır. Personele dağıtılırsa kasa defterine Personel Giderleri › Bahşiş Ödemesi olarak girin." />
         </div>
       </div>
 
       <div className="rh-grid-2-1">
-        <Card title="Satış eğrisi" subtitle={`${granularityLabel} net satış${trendPrev ? ` · ${compareLabel} ile karşılaştırmalı` : ''}`}>
+        <Card title="Satış eğrisi" subtitle={`${granularityLabel} net ciro${trendPrev ? ` · ${compareLabel} ile karşılaştırmalı` : ''}`}>
           <LineCompareChart points={trend.points} previous={trendPrev} previousLabel={compareLabel || 'Önceki dönem'} />
         </Card>
         <Card title="Öne çıkanlar" subtitle="Verilerden otomatik çıkarıldı">
@@ -113,13 +114,13 @@ export default function OverviewSection({ data, compareLabel, onNavigate, canSee
             { label: 'Veresiye', value: collections.veresiye, sub: `${num(collections.counts.veresiye)} işlem` }
           ]} />
         </Card>
-        <Card title="En çok satanlar" subtitle="Ciroya göre ilk 5"
+        <Card title="En çok satanlar" subtitle="Satış tutarına göre ilk 5"
           actions={<button type="button" className="rh-link" onClick={() => onNavigate('products')}>Tümü <ArrowRight size={13} /></button>}>
           {top?.length ? top.slice(0, 5).map((p, i) => (
             <BarRow key={p.product_id} label={<><b className="rh-rank">{i + 1}</b>{p.product_name}</>} value={p.revenue} max={topMax} extra={`${num(p.qty)} adet`} />
           )) : <Empty />}
         </Card>
-        <Card title="Kategoriler" subtitle="Ciro payı"
+        <Card title="Kategoriler" subtitle="Satış payı"
           actions={canSee.sales && <button type="button" className="rh-link" onClick={() => onNavigate('products')}>Ayrıntı <ArrowRight size={13} /></button>}>
           {categories?.length ? categories.slice(0, 6).map(c => (
             <BarRow key={c.category_name} label={c.category_name} value={c.revenue} max={categories[0].revenue} extra={pct(c.share, 0)} />
